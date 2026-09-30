@@ -92,6 +92,27 @@ platformbeheerder zodat je bij `/admin` kunt:
 npm run seed:admin -- jouw@email.com
 ```
 
+## Draaien in Docker
+
+De app zelf draait gecontaineriseerd; de database blijft Neon (cloud), dus
+er zit geen Postgres-container in de compose-file.
+
+```bash
+vercel env pull --yes    # zorg dat .env.local actueel is (DATABASE_URL, CRON_SECRET)
+docker compose up --build -d
+```
+
+Draait daarna op http://localhost:3003 (container luistert intern op 3000,
+zie `docker-compose.yml` om de host-poort aan te passen). `Dockerfile`
+bouwt een multi-stage productie-image op basis van Next.js' standalone
+output (`output: "standalone"` in `next.config.ts`) — geen `node_modules`
+nodig in de uiteindelijke image.
+
+```bash
+docker compose logs -f app   # logs volgen
+docker compose down          # stoppen
+```
+
 ## Belangrijkste mappen
 
 - `src/db/schema.ts` — datamodel (bedrijven, gebruikers, leveranciers, producten, bestellingen)
