@@ -1,4 +1,6 @@
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
+import { products } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,12 +9,21 @@ import { SupplierRowActions } from "@/components/admin/supplier-row-actions";
 import { formatDate } from "@/lib/format";
 import { Plug } from "lucide-react";
 
+// A supplier sync (via the "Sync" button's server action) can take a while
+// for large feeds — e.g. Annapol's ~70k-product XML catalog.
+export const maxDuration = 300;
+
 export default async function AdminSuppliersPage() {
   const db = getDb();
-  const allSuppliers = await db.query.suppliers.findMany({
-    orderBy: (t, { desc }) => desc(t.createdAt),
-    with: { products: { columns: { id: true } } },
-  });
+  const [allSuppliers, productCounts] = await Promise.all([
+    db.query.suppliers.findMany({ orderBy: (t, { desc }) => desc(t.createdAt) }),
+    db
+      .select({ supplierId: products.supplierId, count: sql<number>`count(*)::int` })
+      .from(products)
+      .where(eq(products.active, true))
+      .groupBy(products.supplierId),
+  ]);
+  const countBySupplier = new Map(productCounts.map((r) => [r.supplierId, r.count]));
 
   return (
     <div>
@@ -62,7 +73,7 @@ export default async function AdminSuppliersPage() {
                     </p>
                   )}
                 </TableCell>
-                <TableCell>{s.products.length}</TableCell>
+                <TableCell>{countBySupplier.get(s.id) ?? 0}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {s.lastSyncedAt ? formatDate(s.lastSyncedAt) : "Nog niet gesynchroniseerd"}
                 </TableCell>

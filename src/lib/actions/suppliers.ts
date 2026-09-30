@@ -7,6 +7,7 @@ import { suppliers } from "@/db/schema";
 import { isPlatformAdmin } from "@/lib/auth";
 import { syncSupplier } from "@/lib/suppliers/sync";
 import type { GenericRestConfig } from "@/lib/suppliers/generic-rest";
+import type { AnnapolConfig } from "@/lib/suppliers/annapol";
 
 export type ActionResult =
   | { ok: true }
@@ -30,48 +31,73 @@ export async function createSupplier(formData: FormData): Promise<ActionResult> 
     const db = getDb();
 
     const name = String(formData.get("name") ?? "").trim();
-    const baseUrl = String(formData.get("baseUrl") ?? "").trim();
-    const authType = String(formData.get("authType") ?? "none") as
-      | "none"
-      | "bearer"
-      | "api_key_header"
-      | "basic";
-    const credential = String(formData.get("credential") ?? "").trim();
+    const adapterType = String(formData.get("adapterType") ?? "generic_rest");
     const syncIntervalMinutes = Number(formData.get("syncIntervalMinutes") ?? 60);
     const defaultMarkupPercent = Number(formData.get("defaultMarkupPercent") ?? 30);
-    const itemsPath = String(formData.get("itemsPath") ?? "").trim();
-    const priceIsDecimal = formData.get("priceIsDecimal") === "on";
 
-    if (!name || !baseUrl) return { ok: false, error: "Naam en API-URL zijn verplicht." };
+    if (!name) return { ok: false, error: "Naam is verplicht." };
 
-    const fieldMap: GenericRestConfig["fields"] = {
-      sku: String(formData.get("fieldSku") ?? "sku"),
-      name: String(formData.get("fieldName") ?? "name"),
-      description: String(formData.get("fieldDescription") ?? "description"),
-      imageUrl: String(formData.get("fieldImageUrl") ?? "imageUrl"),
-      category: String(formData.get("fieldCategory") ?? "category"),
-      unit: String(formData.get("fieldUnit") ?? "unit"),
-      price: String(formData.get("fieldPrice") ?? "price"),
-      priceIsDecimal,
-      currency: String(formData.get("fieldCurrency") ?? "currency"),
-      stock: String(formData.get("fieldStock") ?? "stock"),
-      minOrderQty: String(formData.get("fieldMinOrderQty") ?? "minOrderQty"),
-    };
-
-    const config: GenericRestConfig = { itemsPath: itemsPath || undefined, fields: fieldMap };
-
-    await db.insert(suppliers).values({
+    const shared = {
       name,
       slug: slugify(name) || crypto.randomUUID(),
-      adapterType: "generic_rest",
-      baseUrl,
-      authType,
-      credential: credential || null,
-      config,
       syncIntervalMinutes: Number.isFinite(syncIntervalMinutes) ? syncIntervalMinutes : 60,
       defaultMarkupPercent: Number.isFinite(defaultMarkupPercent) ? defaultMarkupPercent : 30,
       active: true,
-    });
+    };
+
+    if (adapterType === "annapol_xml") {
+      const user = String(formData.get("annapolUser") ?? "").trim();
+      const hash = String(formData.get("credential") ?? "").trim();
+      if (!user || !hash) {
+        return { ok: false, error: "E-mailadres (user) en hash zijn verplicht voor Annapol." };
+      }
+
+      const config: AnnapolConfig = { user };
+      await db.insert(suppliers).values({
+        ...shared,
+        adapterType: "annapol_xml",
+        baseUrl: "https://www.annapol.com",
+        authType: "none",
+        credential: hash,
+        config,
+      });
+    } else {
+      const baseUrl = String(formData.get("baseUrl") ?? "").trim();
+      const authType = String(formData.get("authType") ?? "none") as
+        | "none"
+        | "bearer"
+        | "api_key_header"
+        | "basic";
+      const credential = String(formData.get("credential") ?? "").trim();
+      const itemsPath = String(formData.get("itemsPath") ?? "").trim();
+      const priceIsDecimal = formData.get("priceIsDecimal") === "on";
+
+      if (!baseUrl) return { ok: false, error: "API-URL is verplicht." };
+
+      const fieldMap: GenericRestConfig["fields"] = {
+        sku: String(formData.get("fieldSku") ?? "sku"),
+        name: String(formData.get("fieldName") ?? "name"),
+        description: String(formData.get("fieldDescription") ?? "description"),
+        imageUrl: String(formData.get("fieldImageUrl") ?? "imageUrl"),
+        category: String(formData.get("fieldCategory") ?? "category"),
+        unit: String(formData.get("fieldUnit") ?? "unit"),
+        price: String(formData.get("fieldPrice") ?? "price"),
+        priceIsDecimal,
+        currency: String(formData.get("fieldCurrency") ?? "currency"),
+        stock: String(formData.get("fieldStock") ?? "stock"),
+        minOrderQty: String(formData.get("fieldMinOrderQty") ?? "minOrderQty"),
+      };
+      const config: GenericRestConfig = { itemsPath: itemsPath || undefined, fields: fieldMap };
+
+      await db.insert(suppliers).values({
+        ...shared,
+        adapterType: "generic_rest",
+        baseUrl,
+        authType,
+        credential: credential || null,
+        config,
+      });
+    }
 
     revalidatePath("/admin/suppliers");
     return { ok: true };

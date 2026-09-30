@@ -50,6 +50,9 @@ Eén overzicht van de hele catalogus, ongeacht herkomst:
   categorie, voorraad, zichtbaarheid.
 - Kolom "Marge" laat direct zien wat je verdient per product
   (verkoopprijs t.o.v. kostprijs).
+- Zowel dit overzicht als de publieke catalogus (`/products`) zijn
+  gepagineerd (resp. 50 en 24 per pagina) — nodig zodra een leverancier
+  tienduizenden producten aanlevert (zie Annapol hieronder).
 
 ## Leveranciers koppelen (`/admin/suppliers`)
 
@@ -71,14 +74,53 @@ code-deploy**:
    `/api/cron/sync-suppliers` aan, die alle actieve leveranciers ververst.
    Beheerders kunnen ook handmatig synchroniseren via de "Sync"-knop.
 
-**Let op — Maxy en Annapol:** dit platform bevat geen kant-en-klare
-koppeling met de specifieke API's van Maxy of Annapol, omdat hun exacte
-API-documentatie (endpoints, authenticatie, veldnamen) niet beschikbaar
-was tijdens het bouwen. De generieke adapter dekt de meeste JSON REST-API's
-out-of-the-box via het configuratieformulier. Wijkt een leverancier-API
-significant af (bv. paginering, XML, een niet-standaard auth-handshake),
-voeg dan een eigen adapter toe in `src/lib/suppliers/` en registreer die in
-`src/lib/suppliers/registry.ts`.
+De generieke adapter dekt de meeste JSON REST-API's out-of-the-box via het
+configuratieformulier. Wijkt een leverancier-API significant af (XML,
+paginering, meerdere feeds die je moet combineren, een niet-standaard
+auth-handshake), voeg dan een eigen adapter toe in `src/lib/suppliers/` en
+registreer die in `src/lib/suppliers/registry.ts` — zoals hieronder voor
+Annapol.
+
+### Annapol — voorbeeld van een eigen adapter (`src/lib/suppliers/annapol.ts`)
+
+Annapol levert geen enkele API, maar **drie XML-feeds** op hetzelfde
+account die je zelf aan elkaar moet knopen (gelinkt via hun interne
+numerieke product-`id`):
+
+- `xml-categories.php` — categorie-id → naam, in meerdere talen (wij gebruiken "en")
+- `xml-stock.php` — actuele voorraad + kostprijs per product (~14 MB)
+- `xml-products.php` — naam/omschrijving/categorie/afbeeldingen per product (~150 MB, ±70.000 producten)
+
+Belangrijke ontwerpkeuzes, relevant als je zelf een vergelijkbare adapter
+bouwt:
+
+- De producten-feed is te groot om in het geheugen te bufferen, dus die
+  wordt **streaming** uitgelezen (SAX-parser, package `sax`) in plaats van
+  in één keer ingelezen.
+- `sax` zet in de niet-strikte modus tag-namen standaard in HOOFDLETTERS —
+  daarom **altijd** de optie `{ lowercase: true }` meegeven, anders matcht
+  geen enkele tag-naam en levert de sync stilzwijgend 0 producten op.
+- Omschrijvingen komen binnen als inline HTML; die worden naar leesbare
+  platte tekst gestript (geen HTML-rendering, dus geen sanitization-risico).
+- Bij zo'n grote catalogus (~70k producten) upsert `sync.ts` in batches
+  van 250 via één multi-row `INSERT ... ON CONFLICT DO UPDATE` in plaats
+  van één query per product — anders duurt een sync veel te lang. Een
+  bulk-`VALUES`-insert zonder doeltabel-context vereist wel expliciete
+  `::type`-casts per kolom, anders wijst Postgres de insert af
+  ("column ... is of type integer but expression is of type text").
+- Eén statement kan met `ON CONFLICT DO UPDATE` nooit dezelfde rij twee
+  keer raken — komt een SKU dubbel voor in de feed (gebeurt bij Annapol),
+  dedupliceer dan éérst (laatste voorkomen wint) vóór je batcht.
+- "Welke producten zijn er niet meer" wordt bepaald via `updated_at <
+  syncStartedAt` in plaats van een `NOT IN (...)`-lijst met alle huidige
+  SKU's — bij 70k SKU's is dat laatste onwerkbaar.
+- `user`/`hash` (hun simpele query-param-auth) staan resp. in
+  `supplier.config.user` en `supplier.credential` — geen aparte
+  auth-headers nodig.
+
+Een sync van de volledige Annapol-catalogus duurt in de praktijk
+~3 minuten (download + streaming parse + batch-upserts) — ruim binnen de
+`maxDuration = 300` die op `/admin/suppliers` en de cron-route staat.
 
 ## Bestel- en factuurflow
 

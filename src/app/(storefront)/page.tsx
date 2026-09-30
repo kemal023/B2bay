@@ -5,8 +5,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { listCategories } from "@/lib/products";
 
+const FEATURED_CATEGORY_COUNT = 16;
+
 export default async function HomePage() {
-  const categories = await listCategories();
+  const allCategories = await listCategories();
+  const categories = allCategories.slice(0, FEATURED_CATEGORY_COUNT);
 
   return (
     <div>
@@ -90,6 +93,13 @@ export default async function HomePage() {
                   </Badge>
                 </Link>
               ))}
+              {allCategories.length > FEATURED_CATEGORY_COUNT && (
+                <Link href="/products">
+                  <Badge className="cursor-pointer px-4 py-2 text-sm">
+                    Alle categorieën &rarr;
+                  </Badge>
+                </Link>
+              )}
             </div>
           </div>
         </section>

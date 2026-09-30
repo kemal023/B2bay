@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { createSupplier } from "@/lib/actions/suppliers";
+import { ADAPTER_TYPE_OPTIONS } from "@/lib/suppliers/registry";
 import { Plug, Plus } from "lucide-react";
 
 const fieldSpecs: { key: string; label: string; defaultValue: string }[] = [
@@ -41,10 +42,12 @@ const fieldSpecs: { key: string; label: string; defaultValue: string }[] = [
 export function SupplierForm() {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [adapterType, setAdapterType] = useState("generic_rest");
   const [authType, setAuthType] = useState("none");
 
   function handleSubmit(formData: FormData) {
     startTransition(async () => {
+      formData.set("adapterType", adapterType);
       formData.set("authType", authType);
       const result = await createSupplier(formData);
       if (result.ok) {
@@ -70,8 +73,7 @@ export function SupplierForm() {
             <Plug className="h-5 w-5" /> Nieuwe leverancier-API koppelen
           </SheetTitle>
           <SheetDescription>
-            Elke JSON REST-API kan gekoppeld worden door aan te geven waar de
-            productenlijst staat en hoe de velden heten.
+            Kies het type koppeling en vul de gegevens van de leverancier in.
           </SheetDescription>
         </SheetHeader>
 
@@ -82,12 +84,19 @@ export function SupplierForm() {
               <Input id="name" name="name" placeholder="Maxy" required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="baseUrl">API-endpoint (productenlijst)</Label>
-              <Input id="baseUrl" name="baseUrl" placeholder="https://api.maxy.example/v1/products" required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="itemsPath">Pad naar productenlijst in de response</Label>
-              <Input id="itemsPath" name="itemsPath" placeholder="bv. data.products (leeg = root array)" />
+              <Label>Type koppeling</Label>
+              <Select value={adapterType} onValueChange={setAdapterType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ADAPTER_TYPE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="syncIntervalMinutes">Synchronisatie-interval (minuten)</Label>
@@ -105,50 +114,83 @@ export function SupplierForm() {
 
           <Separator />
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Authenticatie</Label>
-              <Select value={authType} onValueChange={setAuthType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Geen</SelectItem>
-                  <SelectItem value="bearer">Bearer token</SelectItem>
-                  <SelectItem value="api_key_header">API-key header (X-Api-Key)</SelectItem>
-                  <SelectItem value="basic">Basic auth (gebruiker:wachtwoord)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {authType !== "none" && (
+          {adapterType === "annapol_xml" ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Annapol levert drie XML-feeds (categorieën, voorraad,
+                producten) op hetzelfde account. Vul hier de inloggegevens
+                in — de drie feed-URL&apos;s worden automatisch opgebouwd.
+              </p>
               <div className="space-y-2">
-                <Label htmlFor="credential">
-                  {authType === "basic" ? "gebruiker:wachtwoord" : "API-sleutel / token"}
-                </Label>
-                <Input id="credential" name="credential" type="password" autoComplete="off" />
+                <Label htmlFor="annapolUser">E-mailadres (user)</Label>
+                <Input id="annapolUser" name="annapolUser" placeholder="naam@bedrijf.nl" required />
               </div>
-            )}
-          </div>
-
-          <Separator />
-
-          <div className="space-y-4">
-            <Label className="text-sm font-medium">Veldnamen in de API-response</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {fieldSpecs.map((f) => (
-                <div key={f.key} className="space-y-1">
-                  <Label htmlFor={f.key} className="text-xs text-muted-foreground">
-                    {f.label}
-                  </Label>
-                  <Input id={f.key} name={f.key} defaultValue={f.defaultValue} className="h-8" />
-                </div>
-              ))}
+              <div className="space-y-2">
+                <Label htmlFor="credential">Hash (API-sleutel)</Label>
+                <Input id="credential" name="credential" type="password" autoComplete="off" required />
+              </div>
             </div>
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" name="priceIsDecimal" className="h-4 w-4 rounded border-border" />
-              Prijs staat als decimaal getal (bv. 12.50) in plaats van centen
-            </label>
-          </div>
+          ) : (
+            <>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="baseUrl">API-endpoint (productenlijst)</Label>
+                  <Input id="baseUrl" name="baseUrl" placeholder="https://api.maxy.example/v1/products" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="itemsPath">Pad naar productenlijst in de response</Label>
+                  <Input id="itemsPath" name="itemsPath" placeholder="bv. data.products (leeg = root array)" />
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Authenticatie</Label>
+                  <Select value={authType} onValueChange={setAuthType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Geen</SelectItem>
+                      <SelectItem value="bearer">Bearer token</SelectItem>
+                      <SelectItem value="api_key_header">API-key header (X-Api-Key)</SelectItem>
+                      <SelectItem value="basic">Basic auth (gebruiker:wachtwoord)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {authType !== "none" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="credential">
+                      {authType === "basic" ? "gebruiker:wachtwoord" : "API-sleutel / token"}
+                    </Label>
+                    <Input id="credential" name="credential" type="password" autoComplete="off" />
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <Label className="text-sm font-medium">Veldnamen in de API-response</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {fieldSpecs.map((f) => (
+                    <div key={f.key} className="space-y-1">
+                      <Label htmlFor={f.key} className="text-xs text-muted-foreground">
+                        {f.label}
+                      </Label>
+                      <Input id={f.key} name={f.key} defaultValue={f.defaultValue} className="h-8" />
+                    </div>
+                  ))}
+                </div>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <input type="checkbox" name="priceIsDecimal" className="h-4 w-4 rounded border-border" />
+                  Prijs staat als decimaal getal (bv. 12.50) in plaats van centen
+                </label>
+              </div>
+            </>
+          )}
 
           <SheetFooter className="px-0">
             <Button type="submit" disabled={isPending} className="w-full">
