@@ -1,42 +1,20 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { isPlatformAdmin } from "@/lib/auth";
-import { Boxes, Building2, ClipboardList, Package } from "lucide-react";
+import { getAppUser } from "@/lib/auth";
+import { AdminSidebar } from "@/components/admin/admin-sidebar";
 
+// Deliberately its own shell (dark, sidebar nav) — never reuses the
+// storefront header/footer, so staff can never mistake this for the
+// public site (and vice versa).
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const allowed = await isPlatformAdmin();
-  if (!allowed) redirect("/dashboard");
+  const user = await getAppUser();
+  if (!user || user.role !== "platform_admin") redirect("/dashboard");
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-semibold tracking-tight">Beheer</h1>
-      <nav className="mt-6 flex gap-2 border-b border-border">
-        <Link
-          href="/admin/products"
-          className="flex items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground hover:border-primary hover:text-foreground"
-        >
-          <Package className="h-4 w-4" /> Producten
-        </Link>
-        <Link
-          href="/admin/suppliers"
-          className="flex items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground hover:border-primary hover:text-foreground"
-        >
-          <Boxes className="h-4 w-4" /> Leveranciers
-        </Link>
-        <Link
-          href="/admin/companies"
-          className="flex items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground hover:border-primary hover:text-foreground"
-        >
-          <Building2 className="h-4 w-4" /> Bedrijven
-        </Link>
-        <Link
-          href="/admin/orders"
-          className="flex items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground hover:border-primary hover:text-foreground"
-        >
-          <ClipboardList className="h-4 w-4" /> Bestellingen
-        </Link>
-      </nav>
-      <div className="mt-8">{children}</div>
+    <div className="dark flex min-h-screen bg-background text-foreground">
+      <AdminSidebar email={user.email} name={user.name} />
+      <main className="min-w-0 flex-1 overflow-x-hidden">
+        <div className="mx-auto max-w-6xl px-6 py-8 sm:px-8">{children}</div>
+      </main>
     </div>
   );
 }
