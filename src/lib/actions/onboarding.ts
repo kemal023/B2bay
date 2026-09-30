@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { companies, users } from "@/db/schema";
-import { ensureAppUser, generateJoinCode } from "@/lib/auth";
+import { generateJoinCode, getAppUser } from "@/lib/auth";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -16,7 +16,8 @@ export async function createCompany(formData: FormData): Promise<ActionResult> {
 
   if (!name) return { ok: false, error: "Bedrijfsnaam is verplicht." };
 
-  const appUser = await ensureAppUser();
+  const appUser = await getAppUser();
+  if (!appUser) return { ok: false, error: "Je bent niet ingelogd." };
   if (appUser.companyId) {
     return { ok: false, error: "Je account is al gekoppeld aan een bedrijf." };
   }
@@ -46,7 +47,8 @@ export async function joinCompany(formData: FormData): Promise<ActionResult> {
   const code = String(formData.get("joinCode") ?? "").trim().toUpperCase();
   if (!code) return { ok: false, error: "Vul een join-code in." };
 
-  const appUser = await ensureAppUser();
+  const appUser = await getAppUser();
+  if (!appUser) return { ok: false, error: "Je bent niet ingelogd." };
   if (appUser.companyId) {
     return { ok: false, error: "Je account is al gekoppeld aan een bedrijf." };
   }

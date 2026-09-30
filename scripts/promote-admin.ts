@@ -1,9 +1,8 @@
 /**
  * Promotes an existing user (identified by email) to platform_admin.
- * The user must have signed in at least once already, since app users are
- * created lazily on first sign-in / onboarding visit.
+ * The user must have registered an account already (via /sign-up).
  *
- * Usage: npx dotenv -e .env.local -- npx tsx scripts/promote-admin.ts you@example.com
+ * Usage: npm run seed:admin -- you@example.com
  */
 import { eq } from "drizzle-orm";
 import { getDb } from "../src/db";

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CartItemRow } from "@/components/cart-item-row";
+import { PlaceOrderButton } from "@/components/place-order-button";
 import { getCartWithTotals } from "@/lib/actions/cart";
 import { getAppUserWithCompany } from "@/lib/auth";
 import { formatPriceCents } from "@/lib/format";
@@ -63,15 +64,14 @@ export default async function CartPage() {
                 <span className="font-medium">{formatPriceCents(subtotalCents)}</span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Verzendkosten en btw worden bij checkout berekend.
+                Verzendkosten hangen af van je bestelling en worden door ons
+                bepaald. Je ontvangt een factuur om per bank over te maken.
               </p>
               {companyApproved ? (
-                <Button asChild className="w-full" size="lg">
-                  <Link href="/checkout">Naar checkout</Link>
-                </Button>
+                <PlaceOrderButton />
               ) : (
                 <Button className="w-full" size="lg" disabled>
-                  Naar checkout
+                  Bestelling plaatsen
                 </Button>
               )}
             </CardContent>

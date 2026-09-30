@@ -30,13 +30,17 @@ export const supplierAuthTypeEnum = pgEnum("supplier_auth_type", [
   "basic",
 ]);
 
+/**
+ * B2B-flow zonder online betaling: de klant plaatst een bestelling, wij
+ * bepalen de verzendkosten (die afhangen van producten/aantallen) en sturen
+ * een factuur die per bank overgemaakt wordt.
+ */
 export const orderStatusEnum = pgEnum("order_status", [
-  "pending_payment",
-  "paid",
-  "processing",
+  "placed", // net geplaatst, wacht op verzendkosten + factuur
+  "invoiced", // factuur verstuurd, wacht op betaling
+  "paid", // betaling ontvangen (handmatig gemarkeerd)
   "fulfilled",
   "cancelled",
-  "refunded",
 ]);
 
 /** A B2B customer organization that can place orders. */
@@ -53,24 +57,37 @@ export const companies = pgTable("companies", {
     .defaultNow(),
 }, (t) => [uniqueIndex("companies_join_code_idx").on(t.joinCode)]);
 
-/** A person who can sign in, linked to Clerk and scoped to a company. */
+/** A person who can sign in, scoped to a company. Auth is self-hosted: no third-party auth provider. */
 export const users = pgTable(
   "users",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    clerkUserId: text("clerk_user_id").notNull(),
+    email: text("email").notNull(),
+    passwordHash: text("password_hash").notNull(),
     companyId: uuid("company_id").references(() => companies.id, {
       onDelete: "set null",
     }),
-    email: text("email").notNull(),
     name: text("name"),
     role: userRoleEnum("role").notNull().default("buyer"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [uniqueIndex("users_clerk_user_id_idx").on(t.clerkUserId)],
+  (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
+
+/** A signed-in session, identified by the SHA-256 hash of the bearer token stored in the session cookie. */
+export const sessions = pgTable("sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+}, (t) => [uniqueIndex("sessions_token_hash_idx").on(t.tokenHash)]);
 
 /**
  * A pluggable upstream product source (e.g. Maxy, Annapol). New suppliers
@@ -163,12 +180,17 @@ export const orders = pgTable("orders", {
   placedByUserId: uuid("placed_by_user_id").references(() => users.id, {
     onDelete: "set null",
   }),
-  status: orderStatusEnum("status").notNull().default("pending_payment"),
+  status: orderStatusEnum("status").notNull().default("placed"),
   subtotalCents: integer("subtotal_cents").notNull(),
+  // Null until an admin determines it (depends on products/quantities).
+  shippingCents: integer("shipping_cents"),
+  // subtotalCents + shippingCents once shipping is known, else subtotalCents.
   totalCents: integer("total_cents").notNull(),
   currency: text("currency").notNull().default("EUR"),
-  stripeCheckoutSessionId: text("stripe_checkout_session_id"),
-  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  invoiceNumber: text("invoice_number"),
+  invoiceNotes: text("invoice_notes"),
+  invoicedAt: timestamp("invoiced_at", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -196,10 +218,18 @@ export const companiesRelations = relations(companies, ({ many }) => ({
   orders: many(orders),
 }));
 
-export const usersRelations = relations(users, ({ one }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   company: one(companies, {
     fields: [users.companyId],
     references: [companies.id],
+  }),
+  sessions: many(sessions),
+}));
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+  user: one(users, {
+    fields: [sessions.userId],
+    references: [users.id],
   }),
 }));
 

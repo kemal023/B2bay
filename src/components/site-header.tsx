@@ -1,12 +1,7 @@
 import Link from "next/link";
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  UserButton,
-} from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { CartLink } from "@/components/cart-link";
+import { UserMenu } from "@/components/user-menu";
 import { getAppUser } from "@/lib/auth";
 import { LayoutDashboard, ShieldCheck } from "lucide-react";
 
@@ -36,34 +31,35 @@ export async function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <SignedIn>
-            {user?.role === "platform_admin" && (
+          {user ? (
+            <>
+              {user.role === "platform_admin" && (
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/admin">
+                    <ShieldCheck className="h-4 w-4" />
+                    Beheer
+                  </Link>
+                </Button>
+              )}
               <Button asChild variant="ghost" size="sm">
-                <Link href="/admin">
-                  <ShieldCheck className="h-4 w-4" />
-                  Beheer
+                <Link href="/dashboard">
+                  <LayoutDashboard className="h-4 w-4" />
+                  Dashboard
                 </Link>
               </Button>
-            )}
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/dashboard">
-                <LayoutDashboard className="h-4 w-4" />
-                Dashboard
-              </Link>
-            </Button>
-            <CartLink />
-            <UserButton />
-          </SignedIn>
-          <SignedOut>
-            <Button asChild variant="ghost" size="sm">
-              <SignInButton mode="modal">
-                <span>Inloggen</span>
-              </SignInButton>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/sign-up">Zakelijk account aanvragen</Link>
-            </Button>
-          </SignedOut>
+              <CartLink />
+              <UserMenu email={user.email} name={user.name} />
+            </>
+          ) : (
+            <>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/sign-in">Inloggen</Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link href="/sign-up">Zakelijk account aanvragen</Link>
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </header>

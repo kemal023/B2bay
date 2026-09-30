@@ -1,15 +1,15 @@
+import Link from "next/link";
 import { getDb } from "@/db";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate, formatPriceCents } from "@/lib/format";
 
 const statusLabels: Record<string, string> = {
-  pending_payment: "Wacht op betaling",
+  placed: "Wacht op factuur",
+  invoiced: "Factuur verstuurd",
   paid: "Betaald",
-  processing: "In behandeling",
   fulfilled: "Afgerond",
   cancelled: "Geannuleerd",
-  refunded: "Terugbetaald",
 };
 
 export default async function AdminOrdersPage() {
@@ -37,7 +37,11 @@ export default async function AdminOrdersPage() {
         <TableBody>
           {allOrders.map((o) => (
             <TableRow key={o.id}>
-              <TableCell className="font-medium">{o.company.name}</TableCell>
+              <TableCell className="font-medium">
+                <Link href={`/admin/orders/${o.id}`} className="hover:underline">
+                  {o.company.name}
+                </Link>
+              </TableCell>
               <TableCell>
                 <Badge variant={o.status === "paid" || o.status === "fulfilled" ? "default" : "secondary"}>
                   {statusLabels[o.status] ?? o.status}
@@ -46,6 +50,9 @@ export default async function AdminOrdersPage() {
               <TableCell className="text-sm text-muted-foreground">{formatDate(o.createdAt)}</TableCell>
               <TableCell className="text-right font-medium">
                 {formatPriceCents(o.totalCents, o.currency)}
+                {o.shippingCents == null && (
+                  <span className="ml-1 text-xs text-muted-foreground">(excl. verzending)</span>
+                )}
               </TableCell>
             </TableRow>
           ))}

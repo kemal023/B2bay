@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { AddToCartForm } from "@/components/add-to-cart-form";
 import { getProduct } from "@/lib/products";
+import { getAppUser } from "@/lib/auth";
 import { formatPriceCents } from "@/lib/format";
 import { PackageSearch } from "lucide-react";
 
@@ -13,7 +13,7 @@ export default async function ProductDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [product, { userId }] = await Promise.all([getProduct(id), auth()]);
+  const [product, user] = await Promise.all([getProduct(id), getAppUser()]);
 
   if (!product) notFound();
 
@@ -54,7 +54,7 @@ export default async function ProductDetailPage({
             <AddToCartForm
               productId={product.id}
               minOrderQty={product.minOrderQty}
-              signedIn={Boolean(userId)}
+              signedIn={Boolean(user)}
             />
           </div>
 

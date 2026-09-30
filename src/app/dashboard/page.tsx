@@ -13,12 +13,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CircleAlert, CircleCheck, Clock } from "lucide-react";
 
 const statusLabels: Record<string, string> = {
-  pending_payment: "Wacht op betaling",
+  placed: "Wacht op factuur",
+  invoiced: "Factuur verstuurd",
   paid: "Betaald",
-  processing: "In behandeling",
   fulfilled: "Afgerond",
   cancelled: "Geannuleerd",
-  refunded: "Terugbetaald",
 };
 
 export default async function DashboardPage() {
@@ -87,8 +86,12 @@ export default async function DashboardPage() {
           </TableHeader>
           <TableBody>
             {companyOrders.map((order) => (
-              <TableRow key={order.id}>
-                <TableCell>{formatDate(order.createdAt)}</TableCell>
+              <TableRow key={order.id} className="cursor-pointer">
+                <TableCell>
+                  <Link href={`/dashboard/orders/${order.id}`} className="block hover:underline">
+                    {formatDate(order.createdAt)}
+                  </Link>
+                </TableCell>
                 <TableCell>
                   <Badge variant={order.status === "paid" || order.status === "fulfilled" ? "default" : "secondary"}>
                     {order.status === "paid" || order.status === "fulfilled" ? (

@@ -1,14 +1,11 @@
 import { redirect } from "next/navigation";
-import { auth } from "@clerk/nextjs/server";
 import { OnboardingForms } from "@/components/onboarding-forms";
 import { getAppUser } from "@/lib/auth";
 
 export default async function OnboardingPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
-
   const appUser = await getAppUser();
-  if (appUser?.companyId) redirect("/dashboard");
+  if (!appUser) redirect("/sign-in");
+  if (appUser.companyId) redirect("/dashboard");
 
   return (
     <div className="mx-auto max-w-lg px-4 py-16 sm:px-6">

@@ -21,7 +21,7 @@ export default async function HomePage() {
             <p className="mt-4 text-lg text-muted-foreground">
               CosmeWeb bundelt actuele voorraad en prijzen van meerdere groothandels
               in één overzichtelijke catalogus — zodat jouw bedrijf sneller en
-              slimmer kan inkopen, met één winkelmandje en één checkout.
+              slimmer kan inkopen, met één winkelmandje en één factuur.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">
@@ -64,11 +64,11 @@ export default async function HomePage() {
           <Card>
             <CardHeader>
               <FileCheck2 className="h-6 w-6 text-primary" />
-              <CardTitle className="mt-2">3. Eén checkout, duidelijke facturatie</CardTitle>
+              <CardTitle className="mt-2">3. Bestel &amp; ontvang je factuur</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Reken veilig af en volg je bestellingen per leverancier vanuit je
-              persoonlijke dashboard.
+              Plaats je bestelling, ontvang een factuur met verzendkosten en
+              maak eenvoudig per bank over. Volg alles vanuit je dashboard.
             </CardContent>
           </Card>
         </div>
