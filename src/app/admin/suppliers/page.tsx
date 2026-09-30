@@ -1,0 +1,79 @@
+import { getDb } from "@/db";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
+import { SupplierForm } from "@/components/admin/supplier-form";
+import { SupplierRowActions } from "@/components/admin/supplier-row-actions";
+import { formatDate } from "@/lib/format";
+import { Plug } from "lucide-react";
+
+export default async function AdminSuppliersPage() {
+  const db = getDb();
+  const allSuppliers = await db.query.suppliers.findMany({
+    orderBy: (t, { desc }) => desc(t.createdAt),
+    with: { products: { columns: { id: true } } },
+  });
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold">Leveranciers &amp; API-koppelingen</h2>
+          <p className="text-sm text-muted-foreground">
+            Voeg een nieuwe leverancier-API toe om automatisch producten in de
+            catalogus te krijgen.
+          </p>
+        </div>
+        <SupplierForm />
+      </div>
+
+      {allSuppliers.length === 0 ? (
+        <Card className="mt-8">
+          <CardContent className="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground">
+            <Plug className="h-10 w-10" />
+            <p>Nog geen leveranciers gekoppeld. Voeg er hierboven één toe.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <Table className="mt-6">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Leverancier</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Producten</TableHead>
+              <TableHead>Laatste sync</TableHead>
+              <TableHead className="text-right">Acties</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {allSuppliers.map((s) => (
+              <TableRow key={s.id}>
+                <TableCell>
+                  <div className="font-medium">{s.name}</div>
+                  <div className="text-xs text-muted-foreground">{s.baseUrl}</div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={s.active ? "default" : "secondary"}>
+                    {s.active ? "Actief" : "Inactief"}
+                  </Badge>
+                  {s.lastSyncError && (
+                    <p className="mt-1 max-w-64 truncate text-xs text-destructive" title={s.lastSyncError}>
+                      {s.lastSyncError}
+                    </p>
+                  )}
+                </TableCell>
+                <TableCell>{s.products.length}</TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {s.lastSyncedAt ? formatDate(s.lastSyncedAt) : "Nog niet gesynchroniseerd"}
+                </TableCell>
+                <TableCell className="text-right">
+                  <SupplierRowActions id={s.id} active={s.active} />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
+  );
+}
