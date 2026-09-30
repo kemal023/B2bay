@@ -2,7 +2,12 @@ import type { suppliers } from "@/db/schema";
 
 export type SupplierRow = typeof suppliers.$inferSelect;
 
-/** A product as normalized from any upstream supplier API. */
+/**
+ * A product as normalized from any upstream supplier API. `costPriceCents`
+ * is what the supplier charges us — never shown to customers and never the
+ * same as our sell price (see lib/suppliers/sync.ts for how sell price is
+ * derived and protected from being overwritten once an admin sets it).
+ */
 export type NormalizedProduct = {
   supplierSku: string;
   name: string;
@@ -10,7 +15,7 @@ export type NormalizedProduct = {
   imageUrl?: string;
   category?: string;
   unit?: string;
-  priceCents: number;
+  costPriceCents: number;
   currency?: string;
   stockQty: number;
   minOrderQty?: number;

@@ -34,9 +34,6 @@ export default async function ProductDetailPage({
         <div>
           {product.category && <Badge variant="secondary">{product.category}</Badge>}
           <h1 className="mt-3 text-3xl font-semibold tracking-tight">{product.name}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Geleverd via {product.supplier.name}
-          </p>
 
           <p className="mt-6 text-3xl font-bold">
             {formatPriceCents(product.priceCents, product.currency)}

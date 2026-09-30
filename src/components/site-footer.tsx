@@ -13,8 +13,7 @@ export function SiteFooter() {
             CosmeWeb
           </div>
           <p className="mt-3 text-sm text-muted-foreground">
-            Eén zakelijk account, meerdere leveranciers, één factuur. Groothandel
-            zoals het hoort te zijn.
+            Eén zakelijk account, één factuur. Groothandel zoals het hoort te zijn.
           </p>
         </div>
 
@@ -31,7 +30,7 @@ export function SiteFooter() {
           <h3 className="text-sm font-semibold">Vertrouwen</h3>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
             <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Geverifieerde bedrijfsaccounts</li>
-            <li className="flex items-center gap-2"><Truck className="h-4 w-4" /> Rechtstreeks van leveranciers</li>
+            <li className="flex items-center gap-2"><Truck className="h-4 w-4" /> Snelle, betrouwbare levering</li>
             <li className="flex items-center gap-2"><FileText className="h-4 w-4" /> Duidelijke facturatie</li>
           </ul>
         </div>

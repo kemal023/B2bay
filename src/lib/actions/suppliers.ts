@@ -38,6 +38,7 @@ export async function createSupplier(formData: FormData): Promise<ActionResult> 
       | "basic";
     const credential = String(formData.get("credential") ?? "").trim();
     const syncIntervalMinutes = Number(formData.get("syncIntervalMinutes") ?? 60);
+    const defaultMarkupPercent = Number(formData.get("defaultMarkupPercent") ?? 30);
     const itemsPath = String(formData.get("itemsPath") ?? "").trim();
     const priceIsDecimal = formData.get("priceIsDecimal") === "on";
 
@@ -68,6 +69,7 @@ export async function createSupplier(formData: FormData): Promise<ActionResult> 
       credential: credential || null,
       config,
       syncIntervalMinutes: Number.isFinite(syncIntervalMinutes) ? syncIntervalMinutes : 60,
+      defaultMarkupPercent: Number.isFinite(defaultMarkupPercent) ? defaultMarkupPercent : 30,
       active: true,
     });
 

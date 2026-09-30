@@ -88,7 +88,6 @@ export default async function ProductsPage({
                     </p>
                   )}
                   <h3 className="mt-1 line-clamp-2 font-medium">{p.name}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">via {p.supplier.name}</p>
                 </CardContent>
                 <CardFooter className="flex items-center justify-between">
                   <span className="font-semibold">

@@ -25,9 +25,6 @@ export async function SiteHeader() {
           <Link href="/#hoe-werkt-het" className="transition-colors hover:text-foreground">
             Hoe het werkt
           </Link>
-          <Link href="/#leveranciers" className="transition-colors hover:text-foreground">
-            Leveranciers
-          </Link>
         </nav>
 
         <div className="flex items-center gap-2">

@@ -32,7 +32,7 @@ const fieldSpecs: { key: string; label: string; defaultValue: string }[] = [
   { key: "fieldImageUrl", label: "Afbeelding-URL", defaultValue: "imageUrl" },
   { key: "fieldCategory", label: "Categorie", defaultValue: "category" },
   { key: "fieldUnit", label: "Eenheid", defaultValue: "unit" },
-  { key: "fieldPrice", label: "Prijs", defaultValue: "price" },
+  { key: "fieldPrice", label: "Inkoopprijs (kostprijs)", defaultValue: "price" },
   { key: "fieldCurrency", label: "Valuta", defaultValue: "currency" },
   { key: "fieldStock", label: "Voorraad", defaultValue: "stock" },
   { key: "fieldMinOrderQty", label: "Min. bestelhoeveelheid", defaultValue: "minOrderQty" },
@@ -92,6 +92,14 @@ export function SupplierForm() {
             <div className="space-y-2">
               <Label htmlFor="syncIntervalMinutes">Synchronisatie-interval (minuten)</Label>
               <Input id="syncIntervalMinutes" name="syncIntervalMinutes" type="number" defaultValue={60} min={5} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="defaultMarkupPercent">Standaardmarge voor nieuwe producten (%)</Label>
+              <Input id="defaultMarkupPercent" name="defaultMarkupPercent" type="number" defaultValue={30} min={0} />
+              <p className="text-xs text-muted-foreground">
+                Verkoopprijs = kostprijs + deze marge. Alleen gebruikt bij eerste
+                import — daarna pas je prijzen per product aan bij Producten.
+              </p>
             </div>
           </div>
 

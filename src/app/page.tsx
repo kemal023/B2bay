@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ArrowRight, Boxes, Building2, FileCheck2, Plug, ShieldCheck, Truck } from "lucide-react";
+import { ArrowRight, Boxes, Building2, FileCheck2, ShieldCheck, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { listActiveSuppliers } from "@/lib/products";
+import { listCategories } from "@/lib/products";
 
 export default async function HomePage() {
-  const suppliers = await listActiveSuppliers();
+  const categories = await listCategories();
 
   return (
     <div>
@@ -16,12 +17,12 @@ export default async function HomePage() {
               Uitsluitend voor zakelijke afnemers
             </span>
             <h1 className="mt-6 text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
-              Eén platform. Meerdere leveranciers. Één zakelijke inkoop.
+              Eén platform voor je volledige zakelijke inkoop.
             </h1>
             <p className="mt-4 text-lg text-muted-foreground">
-              CosmeWeb bundelt actuele voorraad en prijzen van meerdere groothandels
-              in één overzichtelijke catalogus — zodat jouw bedrijf sneller en
-              slimmer kan inkopen, met één winkelmandje en één factuur.
+              CosmeWeb biedt een breed assortiment professionele producten
+              tegen scherpe zakelijke prijzen — besteld via één account, met
+              duidelijke facturatie achteraf.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg">
@@ -54,11 +55,11 @@ export default async function HomePage() {
           <Card>
             <CardHeader>
               <Boxes className="h-6 w-6 text-primary" />
-              <CardTitle className="mt-2">2. Bestel bij meerdere leveranciers</CardTitle>
+              <CardTitle className="mt-2">2. Bestel je assortiment</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Voeg producten van verschillende leveranciers toe aan één
-              winkelmandje — geen aparte accounts of bestelprocessen nodig.
+              Voeg producten toe aan je winkelmandje en bestel alles in
+              één keer, zonder aparte accounts of bestelprocessen.
             </CardContent>
           </Card>
           <Card>
@@ -74,40 +75,25 @@ export default async function HomePage() {
         </div>
       </section>
 
-      <section id="leveranciers" className="border-t border-border bg-muted/30">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-semibold tracking-tight">Aangesloten leveranciers</h2>
-              <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-                Onze catalogus wordt automatisch gesynchroniseerd met de
-                voorraad- en prijs-API&apos;s van elke aangesloten leverancier.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Plug className="h-4 w-4" />
-              Nieuwe leverancier? Neem contact op om je API aan te sluiten.
+      {categories.length > 0 && (
+        <section className="border-t border-border bg-muted/30">
+          <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+            <h2 className="text-2xl font-semibold tracking-tight">Ons assortiment</h2>
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+              Een breed, actueel aanbod — direct uit voorraad.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-2">
+              {categories.map((c) => (
+                <Link key={c} href={`/products?category=${encodeURIComponent(c)}`}>
+                  <Badge variant="secondary" className="cursor-pointer px-4 py-2 text-sm">
+                    {c}
+                  </Badge>
+                </Link>
+              ))}
             </div>
           </div>
-
-          <div className="mt-8 flex flex-wrap gap-3">
-            {suppliers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Er worden momenteel leveranciers aangesloten — kom binnenkort terug.
-              </p>
-            ) : (
-              suppliers.map((s) => (
-                <span
-                  key={s.id}
-                  className="rounded-full border border-border bg-background px-4 py-2 text-sm font-medium"
-                >
-                  {s.name}
-                </span>
-              ))
-            )}
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <div className="flex items-center gap-3 rounded-lg border border-border bg-background p-6">

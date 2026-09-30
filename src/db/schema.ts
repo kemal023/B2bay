@@ -112,6 +112,10 @@ export const suppliers = pgTable(
     // { itemsPath: "data.products", sku: "sku", name: "title", ... }
     config: jsonb("config").$type<Record<string, unknown>>().default({}),
     syncIntervalMinutes: integer("sync_interval_minutes").notNull().default(60),
+    // Applied to a product's cost price to compute its initial sell price
+    // when it's first imported. Purely a starting point — admins can then
+    // fine-tune the sell price per product from /admin/products.
+    defaultMarkupPercent: integer("default_markup_percent").notNull().default(30),
     active: boolean("active").notNull().default(true),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     lastSyncError: text("last_sync_error"),
@@ -122,25 +126,41 @@ export const suppliers = pgTable(
   (t) => [uniqueIndex("suppliers_slug_idx").on(t.slug)],
 );
 
-/** A product mirrored from a supplier's catalog into our own store. */
+/**
+ * A product in our own store catalog. Customers only ever see this — never
+ * where it came from. `supplierId`/`supplierSku` are set when a product was
+ * imported via a supplier API sync (see lib/suppliers/sync.ts); they're null
+ * for products an admin added by hand. `costPriceCents` is what we pay the
+ * supplier (never shown to customers); `priceCents` is what we charge —
+ * admins control it independently so there's room for margin.
+ *
+ * Once `customized` is true, sync no longer overwrites the commercial/
+ * display fields (name, description, image, category, price, unit, min
+ * order qty) an admin has edited — it keeps refreshing cost price, stock,
+ * and availability though, since those must stay accurate.
+ */
 export const products = pgTable(
   "products",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    supplierId: uuid("supplier_id")
-      .notNull()
-      .references(() => suppliers.id, { onDelete: "cascade" }),
-    supplierSku: text("supplier_sku").notNull(),
+    supplierId: uuid("supplier_id").references(() => suppliers.id, {
+      onDelete: "set null",
+    }),
+    supplierSku: text("supplier_sku"),
     name: text("name").notNull(),
     description: text("description"),
     imageUrl: text("image_url"),
     category: text("category"),
     unit: text("unit").notNull().default("stuk"),
+    // What we pay the supplier. Null for products with no supplier (added by hand).
+    costPriceCents: integer("cost_price_cents"),
+    // What the customer pays.
     priceCents: integer("price_cents").notNull(),
     currency: text("currency").notNull().default("EUR"),
     stockQty: integer("stock_qty").notNull().default(0),
     minOrderQty: integer("min_order_qty").notNull().default(1),
     active: boolean("active").notNull().default(true),
+    customized: boolean("customized").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -267,5 +287,11 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, {
     fields: [orderItems.orderId],
     references: [orders.id],
+  }),
+  // Internal only — which supplier to (re)order this line item from to
+  // fulfill the order. Never shown to the customer.
+  supplier: one(suppliers, {
+    fields: [orderItems.supplierId],
+    references: [suppliers.id],
   }),
 }));

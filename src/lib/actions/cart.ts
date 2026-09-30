@@ -95,7 +95,7 @@ export async function getCartWithTotals() {
   const db = getDb();
   const rows = await db.query.cartItems.findMany({
     where: eq(cartItems.companyId, user.company.id),
-    with: { product: { with: { supplier: true } } },
+    with: { product: true },
     orderBy: (t, { desc }) => desc(t.updatedAt),
   });
 

@@ -24,7 +24,7 @@ export async function placeOrder(): Promise<ActionResult> {
   const db = getDb();
   const items = await db.query.cartItems.findMany({
     where: eq(cartItems.companyId, user.company.id),
-    with: { product: { with: { supplier: true } } },
+    with: { product: true },
   });
 
   if (items.length === 0) return { ok: false, error: "Je winkelmandje is leeg." };

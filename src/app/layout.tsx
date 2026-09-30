@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "CosmeWeb — Groothandel voor professionals",
   description:
-    "B2B-platform voor zakelijke inkoop: bestel bij meerdere leveranciers via één account, één winkelmandje en één factuur.",
+    "B2B-webshop voor zakelijke inkoop: bestel je volledige assortiment via één account, met duidelijke facturatie achteraf.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

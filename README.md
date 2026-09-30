@@ -1,11 +1,12 @@
 # CosmeWeb
 
-B2B-groothandelplatform: zakelijke afnemers loggen in, bestellen producten die
-automatisch gesynchroniseerd worden vanuit meerdere leverancier-API's (bv.
-Maxy, Annapol), en plaatsen die bestelling via één winkelmandje. Er wordt
-niet online afgerekend: verzendkosten hangen af van de bestelling, dus een
-beheerder bepaalt die achteraf en stuurt een factuur die per bank
-overgemaakt wordt.
+B2B-webshop: zakelijke afnemers loggen in en bestellen uit **ons eigen**
+assortiment — nergens op de site is te zien dat producten achter de
+schermen ingekocht worden bij leveranciers zoals Maxy of Annapol. Wij
+kopen zelf in (handmatig, of automatisch via een leverancier-API-koppeling)
+en verkopen door met onze eigen marge. Er wordt niet online afgerekend:
+verzendkosten hangen af van de bestelling, dus een beheerder bepaalt die
+achteraf en stuurt een factuur die per bank overgemaakt wordt.
 
 ## Stack
 
@@ -14,21 +15,58 @@ overgemaakt wordt.
 - **Eigen authenticatie** (geen derde partij) — e-mail/wachtwoord met scrypt-hashing en sessies in onze eigen database (zie "Authenticatie" hieronder)
 - **Vercel Cron** — periodieke synchronisatie van leverancier-catalogi
 
-## Architectuur: leveranciers toevoegen
+## White-label: klanten zien nooit waar producten vandaan komen
 
-De kernfunctie van dit platform is dat nieuwe leveranciers **zonder
-code-deploy** toegevoegd kunnen worden, via `/admin/suppliers`:
+- Productkaarten, productpagina's, winkelmandje en bestellingen tonen
+  uitsluitend onze eigen naam, omschrijving, afbeelding en prijs — nergens
+  "via [leverancier]" of iets vergelijkbaars.
+  De homepage noemt geen leveranciersnamen (alleen categorieën uit ons
+  eigen assortiment).
+- Beheerders zien de leverancier per bestelregel wél, bij
+  `/admin/orders/[id]` onder "Inkoop bij leveranciers" — inclusief link
+  naar de leverancier, zodat je weet waar je moet (her)bestellen om een
+  order te kunnen leveren. Dat blok is nooit zichtbaar voor klanten.
+
+## Kostprijs vs. verkoopprijs (marge)
+
+Elk product heeft een `costPriceCents` (wat wij betalen, bij
+leverancier-producten automatisch bijgewerkt) en een `priceCents` (wat de
+klant betaalt). Bij een nieuwe leverancier stel je een standaardmarge in
+(%) — daarmee wordt bij import automatisch een verkoopprijs berekend
+(kostprijs + marge). Zodra een beheerder een product bewerkt via
+`/admin/products`, wordt het gemarkeerd als `customized`: de eerstvolgende
+synchronisatie werkt dan alleen nog kostprijs, voorraad en
+beschikbaarheid bij — naam, omschrijving, afbeelding, categorie en
+verkoopprijs blijven zoals de beheerder ze heeft ingesteld.
+
+## Productbeheer (`/admin/products`)
+
+Eén overzicht van de hele catalogus, ongeacht herkomst:
+
+- **Handmatig een product toevoegen** — geen leverancier nodig, gewoon
+  naam, prijs, voorraad, etc. invullen.
+- **Elk product bewerken** — ook producten die uit een
+  leverancierskoppeling komen; prijs, naam, omschrijving, afbeelding,
+  categorie, voorraad, zichtbaarheid.
+- Kolom "Marge" laat direct zien wat je verdient per product
+  (verkoopprijs t.o.v. kostprijs).
+
+## Leveranciers koppelen (`/admin/suppliers`)
+
+De kernfunctie om automatisch producten binnen te krijgen, **zonder
+code-deploy**:
 
 1. Een platform-beheerder vult in het adminpaneel de API-URL, het
-   authenticatietype (geen / bearer token / API-key header / basic auth) en
-   een veldmapping in (welke JSON-velden corresponderen met naam, prijs,
-   voorraad, etc.).
+   authenticatietype (geen / bearer token / API-key header / basic auth),
+   een standaardmarge (%) en een veldmapping in (welke JSON-velden
+   corresponderen met naam, kostprijs, voorraad, etc.).
 2. Dit wordt opgeslagen in de `suppliers`-tabel (zie `src/db/schema.ts`).
 3. `src/lib/suppliers/generic-rest.ts` is een generieke adapter die elke
    JSON REST-API kan uitlezen op basis van die configuratie.
 4. `src/lib/suppliers/sync.ts` haalt producten op en zet ze (upsert) in de
-   `products`-tabel; producten die niet meer in de leveranciersfeed
-   voorkomen, worden gedeactiveerd (niet verwijderd, voor bestelhistorie).
+   `products`-tabel (zie "Kostprijs vs. verkoopprijs" hierboven);
+   producten die niet meer in de leveranciersfeed voorkomen, worden
+   gedeactiveerd (niet verwijderd, voor bestelhistorie).
 5. Een cron-job (`vercel.ts`, elke 30 min) roept
    `/api/cron/sync-suppliers` aan, die alle actieve leveranciers ververst.
    Beheerders kunnen ook handmatig synchroniseren via de "Sync"-knop.
@@ -117,6 +155,6 @@ docker compose down          # stoppen
 
 - `src/db/schema.ts` — datamodel (bedrijven, gebruikers, leveranciers, producten, bestellingen)
 - `src/lib/suppliers/` — leverancier-adapters en synchronisatielogica
-- `src/lib/actions/` — server actions (cart, bestellingen, onboarding, admin)
-- `src/app/admin/` — adminpaneel (leveranciers, bedrijven, bestellingen)
+- `src/lib/actions/` — server actions (cart, bestellingen, producten, onboarding, admin)
+- `src/app/admin/` — adminpaneel (producten, leveranciers, bedrijven, bestellingen)
 - `src/app/` — publieke catalogus, winkelmandje, dashboard

@@ -20,7 +20,6 @@ type CartItem = {
     priceCents: number;
     currency: string;
     minOrderQty: number;
-    supplier: { name: string };
   };
 };
 
@@ -55,7 +54,6 @@ export function CartItemRow({ item }: { item: CartItem }) {
           <Link href={`/products/${item.product.id}`} className="font-medium hover:underline">
             {item.product.name}
           </Link>
-          <p className="text-xs text-muted-foreground">via {item.product.supplier.name}</p>
         </div>
         <div className="flex items-center gap-3">
           <Input

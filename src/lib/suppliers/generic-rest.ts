@@ -29,7 +29,7 @@ export type GenericRestConfig = {
     imageUrl?: string;
     category?: string;
     unit?: string;
-    /** Price field. Assumed to already be in the store currency's smallest unit (cents) unless priceIsDecimal is true. */
+    /** Cost price field (what the supplier charges us) — not the customer's price. Assumed to already be in cents unless priceIsDecimal is true. */
     price?: string;
     priceIsDecimal?: boolean;
     currency?: string;
@@ -80,7 +80,7 @@ export const genericRestAdapter: SupplierAdapter = {
     const f = config.fields ?? {};
     return rawItems.map((item): NormalizedProduct => {
       const rawPrice = toNumber(getPath(item, f.price ?? "price"));
-      const priceCents = f.priceIsDecimal ? Math.round(rawPrice * 100) : Math.round(rawPrice);
+      const costPriceCents = f.priceIsDecimal ? Math.round(rawPrice * 100) : Math.round(rawPrice);
 
       return {
         supplierSku: String(getPath(item, f.sku ?? "sku") ?? ""),
@@ -89,7 +89,7 @@ export const genericRestAdapter: SupplierAdapter = {
         imageUrl: getPath(item, f.imageUrl ?? "imageUrl") as string | undefined,
         category: getPath(item, f.category ?? "category") as string | undefined,
         unit: (getPath(item, f.unit ?? "unit") as string | undefined) ?? "stuk",
-        priceCents,
+        costPriceCents,
         currency: (getPath(item, f.currency ?? "currency") as string | undefined) ?? "EUR",
         stockQty: toNumber(getPath(item, f.stock ?? "stock")),
         minOrderQty: toNumber(getPath(item, f.minOrderQty ?? "minOrderQty"), 1),

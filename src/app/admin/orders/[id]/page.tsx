@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { InvoiceForm, OrderStatusActions } from "@/components/admin/order-actions";
+import { ExternalLink, Truck } from "lucide-react";
 
 const statusLabels: Record<string, string> = {
   placed: "Wacht op factuur",
@@ -25,10 +26,28 @@ export default async function AdminOrderDetailPage({
   const db = getDb();
   const order = await db.query.orders.findFirst({
     where: eq(orders.id, id),
-    with: { items: true, company: true },
+    with: {
+      items: { with: { supplier: { columns: { name: true, baseUrl: true } } } },
+      company: true,
+    },
   });
 
   if (!order) notFound();
+
+  const bySupplier = new Map<
+    string,
+    { name: string; baseUrl: string | null; items: typeof order.items }
+  >();
+  for (const item of order.items) {
+    const key = item.supplierId ?? "none";
+    const entry = bySupplier.get(key) ?? {
+      name: item.supplier?.name ?? "Eigen voorraad",
+      baseUrl: item.supplier?.baseUrl ?? null,
+      items: [],
+    };
+    entry.items.push(item);
+    bySupplier.set(key, entry);
+  }
 
   return (
     <div className="max-w-3xl">
@@ -98,6 +117,44 @@ export default async function AdminOrderDetailPage({
           </Card>
         )}
       </div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Truck className="h-4 w-4" /> Inkoop bij leveranciers
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Alleen zichtbaar voor beheerders — de klant ziet dit nergens.
+            Gebruik dit om te bepalen waar je deze bestelling moet inkopen.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {[...bySupplier.values()].map((group) => (
+            <div key={group.name} className="rounded-lg border border-border p-3">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">{group.name}</span>
+                {group.baseUrl && (
+                  <a
+                    href={group.baseUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    Naar leverancier <ExternalLink className="h-3 w-3" />
+                  </a>
+                )}
+              </div>
+              <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                {group.items.map((item) => (
+                  <li key={item.id}>
+                    {item.nameSnapshot} × {item.quantity}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 }
