@@ -21,6 +21,7 @@ import { Loader2 } from "lucide-react";
 type ProductFormValues = {
   id: string;
   name: string;
+  ean: string | null;
   description: string | null;
   imageUrl: string | null;
   category: string | null;
@@ -75,6 +76,14 @@ export function ProductForm({
           <div className="space-y-2">
             <Label htmlFor="name">Naam</Label>
             <Input id="name" name="name" defaultValue={product?.name} required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="ean">EAN</Label>
+            <Input id="ean" name="ean" defaultValue={product?.ean ?? ""} placeholder="bv. 5901436709251" />
+            <p className="text-xs text-muted-foreground">
+              Barcode. Uniek per fysiek product — producten met dezelfde EAN
+              van verschillende leveranciers worden automatisch gekoppeld.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="description">Omschrijving</Label>

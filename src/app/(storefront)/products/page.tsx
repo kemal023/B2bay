@@ -40,7 +40,7 @@ export default async function ProductsPage({
         <form className="flex flex-wrap gap-2" action="/products">
           <Input
             name="q"
-            placeholder="Zoek op naam of categorie..."
+            placeholder="Zoek op naam, categorie of EAN..."
             defaultValue={q}
             className="w-56"
           />

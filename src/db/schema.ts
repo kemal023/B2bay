@@ -147,7 +147,19 @@ export const products = pgTable(
       onDelete: "set null",
     }),
     supplierSku: text("supplier_sku"),
+    // Barcode (European Article Number) — globally unique per physical
+    // product. When two suppliers list the same EAN, sync.ts links them to
+    // the same product row instead of creating a duplicate listing, and
+    // customers can search by EAN.
+    ean: text("ean"),
     name: text("name").notNull(),
+    // The name exactly as the supplier sent it (e.g. Polish), before
+    // translation. As long as name === sourceName the product hasn't been
+    // translated yet. Sync always refreshes sourceName from the feed, but
+    // only overwrites the customer-facing `name` when it still equals the
+    // previous sourceName — so a translated name is never clobbered by a
+    // later sync, without needing the `customized` flag.
+    sourceName: text("source_name"),
     description: text("description"),
     imageUrl: text("image_url"),
     category: text("category"),
@@ -170,7 +182,28 @@ export const products = pgTable(
   },
   (t) => [
     uniqueIndex("products_supplier_sku_idx").on(t.supplierId, t.supplierSku),
+    uniqueIndex("products_ean_idx").on(t.ean),
   ],
+);
+
+/**
+ * Cache of translated text (product categories, and any product name that
+ * repeats verbatim across multiple SKUs — common for colour/size variants)
+ * so the exact same source string is never translated twice. One-time,
+ * done directly (no external translation API) and stored here for reuse.
+ */
+export const translations = pgTable(
+  "translations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sourceLang: text("source_lang").notNull(),
+    sourceText: text("source_text").notNull(),
+    translatedText: text("translated_text").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("translations_source_idx").on(t.sourceLang, t.sourceText)],
 );
 
 /** One line in a company's persistent shopping cart. */

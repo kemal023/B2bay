@@ -45,6 +45,7 @@ export default async function ProductDetailPage({
             Minimale bestelhoeveelheid: {product.minOrderQty} {product.unit}
             {" · "}
             {product.stockQty > 0 ? `${product.stockQty} op voorraad` : "Beperkte voorraad"}
+            {product.ean && ` · EAN: ${product.ean}`}
           </p>
 
           <div className="mt-6">

@@ -24,6 +24,8 @@ export type GenericRestConfig = {
   /** Field name (or dotted path) mappings, relative to each item. */
   fields?: {
     sku?: string;
+    /** Barcode field (EAN/UPC), if the supplier provides one. */
+    ean?: string;
     name?: string;
     description?: string;
     imageUrl?: string;
@@ -82,8 +84,11 @@ export const genericRestAdapter: SupplierAdapter = {
       const rawPrice = toNumber(getPath(item, f.price ?? "price"));
       const costPriceCents = f.priceIsDecimal ? Math.round(rawPrice * 100) : Math.round(rawPrice);
 
+      const ean = getPath(item, f.ean ?? "ean");
+
       return {
         supplierSku: String(getPath(item, f.sku ?? "sku") ?? ""),
+        ean: ean ? String(ean) : undefined,
         name: String(getPath(item, f.name ?? "name") ?? "Onbekend product"),
         description: getPath(item, f.description ?? "description") as string | undefined,
         imageUrl: getPath(item, f.imageUrl ?? "imageUrl") as string | undefined,

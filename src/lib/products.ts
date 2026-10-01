@@ -13,7 +13,11 @@ export async function listProducts(
   if (opts.q) {
     const term = `%${opts.q}%`;
     conditions.push(
-      or(ilike(products.name, term), ilike(products.category, term))!,
+      or(
+        ilike(products.name, term),
+        ilike(products.category, term),
+        ilike(products.ean, term),
+      )!,
     );
   }
   if (opts.category) {

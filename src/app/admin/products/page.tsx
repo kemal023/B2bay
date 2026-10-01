@@ -27,7 +27,9 @@ export default async function AdminProductsPage({
   const conditions = [];
   if (q) {
     const term = `%${q}%`;
-    conditions.push(or(ilike(products.name, term), ilike(products.category, term))!);
+    conditions.push(
+      or(ilike(products.name, term), ilike(products.category, term), ilike(products.ean, term))!,
+    );
   }
   if (supplierFilter === "manual") {
     conditions.push(isNull(products.supplierId));
@@ -82,7 +84,7 @@ export default async function AdminProductsPage({
       </div>
 
       <form className="mt-6 flex flex-wrap items-center gap-2" action="/admin/products">
-        <Input name="q" placeholder="Zoek op naam of categorie..." defaultValue={q} className="w-64" />
+        <Input name="q" placeholder="Zoek op naam, categorie of EAN..." defaultValue={q} className="w-64" />
         <select
           name="supplier"
           defaultValue={supplierFilter ?? ""}
@@ -137,7 +139,9 @@ export default async function AdminProductsPage({
                   <TableRow key={p.id}>
                     <TableCell>
                       <div className="font-medium">{p.name}</div>
-                      {p.category && <div className="text-xs text-muted-foreground">{p.category}</div>}
+                      <div className="text-xs text-muted-foreground">
+                        {[p.category, p.ean].filter(Boolean).join(" · ")}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {p.supplier?.name ?? "Handmatig"}
@@ -162,6 +166,7 @@ export default async function AdminProductsPage({
                         product={{
                           id: p.id,
                           name: p.name,
+                          ean: p.ean,
                           description: p.description,
                           imageUrl: p.imageUrl,
                           category: p.category,

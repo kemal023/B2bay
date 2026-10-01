@@ -111,6 +111,7 @@ function parseStock(xml: string): Map<number, StockEntry> {
 type CurrentProduct = {
   id: number;
   symbol: string;
+  ean: string;
   stockAttr: number;
   priceEurAttr: number;
   name: string;
@@ -151,6 +152,7 @@ async function streamProducts(
         current = {
           id: Number(node.attributes.id),
           symbol: String(node.attributes.symbol ?? ""),
+          ean: String(node.attributes.ean ?? ""),
           stockAttr: Number(node.attributes.stock ?? 0),
           priceEurAttr: Number(node.attributes.price_eur ?? 0),
           name: "",
@@ -231,6 +233,7 @@ async function streamProducts(
 
         products.push({
           supplierSku: p.symbol,
+          ean: p.ean || undefined,
           name: p.name || p.symbol,
           description: p.description ? stripHtml(p.description) : undefined,
           imageUrl: p.images[0],

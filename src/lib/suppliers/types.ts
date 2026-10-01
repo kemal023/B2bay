@@ -10,6 +10,9 @@ export type SupplierRow = typeof suppliers.$inferSelect;
  */
 export type NormalizedProduct = {
   supplierSku: string;
+  /** Barcode (EAN/UPC), when the supplier provides one. Used to link the
+   * same physical product across suppliers instead of duplicating it. */
+  ean?: string;
   name: string;
   description?: string;
   imageUrl?: string;

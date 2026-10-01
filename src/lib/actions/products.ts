@@ -19,6 +19,7 @@ function revalidateProducts() {
 
 function readProductForm(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
+  const ean = String(formData.get("ean") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const imageUrl = String(formData.get("imageUrl") ?? "").trim();
   const category = String(formData.get("category") ?? "").trim();
@@ -28,7 +29,7 @@ function readProductForm(formData: FormData) {
   const minOrderQty = Number(formData.get("minOrderQty") ?? 1);
   const active = formData.get("active") === "on";
 
-  return { name, description, imageUrl, category, unit, priceEuro, stockQty, minOrderQty, active };
+  return { name, ean, description, imageUrl, category, unit, priceEuro, stockQty, minOrderQty, active };
 }
 
 /** Adds a product the store owns outright — no supplier, admin sets everything. */
@@ -47,6 +48,7 @@ export async function createProduct(formData: FormData): Promise<ActionResult> {
       supplierId: null,
       supplierSku: null,
       name: f.name,
+      ean: f.ean || null,
       description: f.description || null,
       imageUrl: f.imageUrl || null,
       category: f.category || null,
@@ -86,6 +88,7 @@ export async function updateProduct(id: string, formData: FormData): Promise<Act
       .update(products)
       .set({
         name: f.name,
+        ean: f.ean || null,
         description: f.description || null,
         imageUrl: f.imageUrl || null,
         category: f.category || null,

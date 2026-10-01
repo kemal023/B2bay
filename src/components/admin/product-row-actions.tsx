@@ -21,6 +21,7 @@ import { Loader2, Pencil, Trash2 } from "lucide-react";
 type Product = {
   id: string;
   name: string;
+  ean: string | null;
   description: string | null;
   imageUrl: string | null;
   category: string | null;
