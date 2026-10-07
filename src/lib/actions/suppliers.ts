@@ -8,6 +8,7 @@ import { isPlatformAdmin } from "@/lib/auth";
 import { syncSupplier } from "@/lib/suppliers/sync";
 import type { GenericRestConfig } from "@/lib/suppliers/generic-rest";
 import type { AnnapolConfig } from "@/lib/suppliers/annapol";
+import type { MaxyConfig } from "@/lib/suppliers/maxy";
 
 export type ActionResult =
   | { ok: true }
@@ -59,6 +60,23 @@ export async function createSupplier(formData: FormData): Promise<ActionResult> 
         baseUrl: "https://www.annapol.com",
         authType: "none",
         credential: hash,
+        config,
+      });
+    } else if (adapterType === "maxy_xml") {
+      const client = String(formData.get("maxyClient") ?? "").trim();
+      const token = String(formData.get("credential") ?? "").trim();
+      const shop = String(formData.get("maxyShop") ?? "1").trim() || "1";
+      if (!client || !token) {
+        return { ok: false, error: "E-mailadres (client) en token zijn verplicht voor Maxy." };
+      }
+
+      const config: MaxyConfig = { client, shop };
+      await db.insert(suppliers).values({
+        ...shared,
+        adapterType: "maxy_xml",
+        baseUrl: "https://old.maxy.eu",
+        authType: "none",
+        credential: token,
         config,
       });
     } else {

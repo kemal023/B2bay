@@ -130,6 +130,26 @@ export function SupplierForm() {
                 <Input id="credential" name="credential" type="password" autoComplete="off" required />
               </div>
             </div>
+          ) : adapterType === "maxy_xml" ? (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Maxy levert één XML-export met Engelse productnamen erin —
+                geen vertaling nodig. Vul de klantgegevens van het
+                account in; de feed-URL wordt automatisch opgebouwd.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="maxyClient">E-mailadres (client)</Label>
+                <Input id="maxyClient" name="maxyClient" placeholder="naam@bedrijf.nl" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="credential">Token (API-sleutel)</Label>
+                <Input id="credential" name="credential" type="password" autoComplete="off" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="maxyShop">Shop-ID</Label>
+                <Input id="maxyShop" name="maxyShop" defaultValue="1" />
+              </div>
+            </div>
           ) : (
             <>
               <div className="space-y-4">

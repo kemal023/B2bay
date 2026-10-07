@@ -1,6 +1,7 @@
 import type { SupplierAdapter } from "./types";
 import { genericRestAdapter } from "./generic-rest";
 import { annapolAdapter } from "./annapol";
+import { maxyAdapter } from "./maxy";
 
 /**
  * Maps a supplier's `adapterType` (chosen in the admin UI) to the code that
@@ -13,6 +14,7 @@ import { annapolAdapter } from "./annapol";
 export const supplierAdapters: Record<string, SupplierAdapter> = {
   generic_rest: genericRestAdapter,
   annapol_xml: annapolAdapter,
+  maxy_xml: maxyAdapter,
 };
 
 export function getSupplierAdapter(adapterType: string): SupplierAdapter {
@@ -27,4 +29,5 @@ export function getSupplierAdapter(adapterType: string): SupplierAdapter {
 export const ADAPTER_TYPE_OPTIONS = [
   { value: "generic_rest", label: "Generieke JSON REST-API" },
   { value: "annapol_xml", label: "Annapol (XML-feeds)" },
+  { value: "maxy_xml", label: "Maxy (XML-feed)" },
 ];
