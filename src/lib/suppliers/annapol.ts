@@ -47,12 +47,13 @@ async function fetchText(url: string): Promise<string> {
   return res.text();
 }
 
-/** Category id -> English name. The feed is small enough to buffer whole. */
-function parseCategoryNames(xml: string): Map<number, string> {
-  const names = new Map<number, string>();
+/** Category id -> English name + parent id. The feed is small enough to buffer whole. */
+function parseCategories(xml: string): Map<number, { name: string; parent: number }> {
+  const categories = new Map<number, { name: string; parent: number }>();
   const parser = sax.parser(false, { trim: true, lowercase: true });
 
   let currentId: number | null = null;
+  let currentParent = 0;
   let inName = false;
   let currentLang = "";
   let buf = "";
@@ -60,6 +61,7 @@ function parseCategoryNames(xml: string): Map<number, string> {
   parser.onopentag = (node) => {
     if (node.name === "category") {
       currentId = Number(node.attributes.id);
+      currentParent = Number(node.attributes.parent ?? 0);
     } else if (node.name === "name") {
       inName = true;
       buf = "";
@@ -76,13 +78,47 @@ function parseCategoryNames(xml: string): Map<number, string> {
     if (tag === "name") {
       inName = false;
       if (currentId != null && currentLang === "en" && buf.trim()) {
-        names.set(currentId, buf.trim());
+        categories.set(currentId, { name: buf.trim(), parent: currentParent });
       }
     }
   };
 
   parser.write(xml).close();
-  return names;
+  return categories;
+}
+
+// A handful of Annapol's own top-level category nodes have no English
+// name in their feed at all, so resolveTopLevelCategory falls through to
+// a raw Polish fallback for them. There are only ever a few of these —
+// translate the known ones directly rather than building a whole second
+// translation pipeline for a couple of strings.
+const CATEGORY_TRANSLATIONS: Record<string, string> = {
+  "Wykrywacze metali i akcesoria": "Metal detectors and accessories",
+  "Pozostałe": "Other",
+  "Optyczne": "Optical",
+};
+
+/**
+ * Annapol's categories form a tree (up to 5 levels) under ~20 top-level
+ * groups (Tools, Electronics, Toys, ...) that are already clean English —
+ * unlike the hundreds of specific leaf categories, which are inconsistent
+ * and often left untranslated. Customers see the top-level group instead,
+ * e.g. "Wkrętaki i śrubokręty" becomes "Tools", not a raw Polish leaf name.
+ */
+function resolveTopLevelCategory(
+  categoryId: number,
+  categories: Map<number, { name: string; parent: number }>,
+): string | undefined {
+  let node = categories.get(categoryId);
+  if (!node) return undefined;
+  const seen = new Set<number>([categoryId]);
+  while (node.parent !== 0) {
+    const parentNode = categories.get(node.parent);
+    if (!parentNode || seen.has(node.parent)) break;
+    seen.add(node.parent);
+    node = parentNode;
+  }
+  return node.name;
 }
 
 type StockEntry = { stock: number; priceEur: number };
@@ -131,7 +167,7 @@ type TextField = "name" | "description" | "categoryId" | "categoryName" | "gfx" 
 async function streamProducts(
   url: string,
   stockById: Map<number, StockEntry>,
-  categoryNames: Map<number, string>,
+  categories: Map<number, { name: string; parent: number }>,
 ): Promise<NormalizedProduct[]> {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
@@ -229,7 +265,8 @@ async function streamProducts(
         const live = stockById.get(p.id);
         const priceEur = live?.priceEur || p.priceEurAttr;
         const stockQty = live ? live.stock : p.stockAttr;
-        const category = (p.categoryId != null ? categoryNames.get(p.categoryId) : undefined) ?? p.categoryNamePl ?? undefined;
+        const resolvedCategory = (p.categoryId != null ? resolveTopLevelCategory(p.categoryId, categories) : undefined) ?? p.categoryNamePl ?? undefined;
+        const category = resolvedCategory ? (CATEGORY_TRANSLATIONS[resolvedCategory] ?? resolvedCategory) : undefined;
 
         products.push({
           supplierSku: p.symbol,
@@ -278,9 +315,9 @@ export const annapolAdapter: SupplierAdapter = {
       fetchText(buildUrl("xml-stock.php", user, hash)),
     ]);
 
-    const categoryNames = parseCategoryNames(categoriesXml);
+    const categories = parseCategories(categoriesXml);
     const stockById = parseStock(stockXml);
 
-    return streamProducts(buildUrl("xml-products.php", user, hash), stockById, categoryNames);
+    return streamProducts(buildUrl("xml-products.php", user, hash), stockById, categories);
   },
 };

@@ -19,6 +19,12 @@ export type MaxyConfig = {
 
 const MAXY_BASE = "https://old.maxy.eu/edi/export-offer.php";
 
+// Maxy's category names come through in English almost everywhere, except
+// a couple of seasonal ones it apparently never bothered translating.
+const CATEGORY_TRANSLATIONS: Record<string, string> = {
+  "Boże Narodzenie": "Christmas",
+};
+
 function buildUrl(client: string, token: string, shop: string): string {
   const params = new URLSearchParams({
     client,
@@ -100,7 +106,10 @@ async function streamProducts(url: string): Promise<NormalizedProduct[]> {
         };
         break;
       case "category":
-        if (current && !current.category) current.category = String(node.attributes.name ?? "");
+        if (current && !current.category) {
+          const name = String(node.attributes.name ?? "");
+          current.category = CATEGORY_TRANSLATIONS[name] ?? name;
+        }
         break;
       case "unit":
         if (current) current.unit = String(node.attributes.name ?? "stuk");
