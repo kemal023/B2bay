@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, eq, ilike, or, sql, isNull } from "drizzle-orm";
+import { and, eq, gt, ilike, or, sql, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { products } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +17,11 @@ const PAGE_SIZE = 50;
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; supplier?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; supplier?: string; minStock?: string; page?: string }>;
 }) {
-  const { q, supplier: supplierFilter, page: pageParam } = await searchParams;
+  const { q, supplier: supplierFilter, minStock: minStockParam, page: pageParam } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
+  const minStock = minStockParam ? Number(minStockParam) : undefined;
 
   const db = getDb();
 
@@ -35,6 +36,9 @@ export default async function AdminProductsPage({
     conditions.push(isNull(products.supplierId));
   } else if (supplierFilter) {
     conditions.push(eq(products.supplierId, supplierFilter));
+  }
+  if (minStock !== undefined && Number.isFinite(minStock)) {
+    conditions.push(gt(products.stockQty, minStock));
   }
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -57,6 +61,7 @@ export default async function AdminProductsPage({
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (supplierFilter) params.set("supplier", supplierFilter);
+    if (minStockParam) params.set("minStock", minStockParam);
     if (target > 1) params.set("page", String(target));
     const qs = params.toString();
     return qs ? `/admin/products?${qs}` : "/admin/products";
@@ -88,18 +93,26 @@ export default async function AdminProductsPage({
         <select
           name="supplier"
           defaultValue={supplierFilter ?? ""}
-          className="h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+          className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground"
         >
-          <option value="">Alle bronnen</option>
-          <option value="manual">Handmatig</option>
+          <option value="" className="bg-background text-foreground">Alle bronnen</option>
+          <option value="manual" className="bg-background text-foreground">Handmatig</option>
           {allSuppliers.map((s) => (
-            <option key={s.id} value={s.id}>
+            <option key={s.id} value={s.id} className="bg-background text-foreground">
               {s.name}
             </option>
           ))}
         </select>
+        <Input
+          name="minStock"
+          type="number"
+          min={0}
+          placeholder="Min. voorraad"
+          defaultValue={minStockParam}
+          className="w-32"
+        />
         <Button type="submit" variant="outline">Filteren</Button>
-        {(q || supplierFilter) && (
+        {(q || supplierFilter || minStockParam) && (
           <Button asChild variant="ghost">
             <Link href="/admin/products">Wissen</Link>
           </Button>
@@ -121,7 +134,7 @@ export default async function AdminProductsPage({
                 <TableHead>Product</TableHead>
                 <TableHead>Bron</TableHead>
                 <TableHead className="text-right">Kostprijs</TableHead>
-                <TableHead className="text-right">Verkoopprijs</TableHead>
+                <TableHead className="text-right">Prijs</TableHead>
                 <TableHead className="text-right">Marge</TableHead>
                 <TableHead className="text-right">Voorraad</TableHead>
                 <TableHead>Status</TableHead>
@@ -138,9 +151,11 @@ export default async function AdminProductsPage({
                 return (
                   <TableRow key={p.id}>
                     <TableCell>
-                      <div className="font-medium">{p.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {[p.category, p.ean].filter(Boolean).join(" · ")}
+                      <div className="w-[220px]">
+                        <div className="truncate font-medium" title={p.name}>{p.name}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {[p.category, p.ean].filter(Boolean).join(" · ")}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">

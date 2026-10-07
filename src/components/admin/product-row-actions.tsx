@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ProductForm } from "@/components/admin/product-form";
 import { deleteProduct, toggleProductActive } from "@/lib/actions/products";
-import { Loader2, Pencil, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Pencil, Trash2 } from "lucide-react";
 
 type Product = {
   id: string;
@@ -61,8 +61,14 @@ export function ProductRowActions({ product }: { product: Product }) {
           </Button>
         }
       />
-      <Button variant="ghost" size="sm" onClick={toggle} disabled={isPending}>
-        {product.active ? "Verbergen" : "Tonen"}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={toggle}
+        disabled={isPending}
+        aria-label={product.active ? "Verbergen" : "Tonen"}
+      >
+        {product.active ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
       </Button>
       <AlertDialog>
         <AlertDialogTrigger asChild>
