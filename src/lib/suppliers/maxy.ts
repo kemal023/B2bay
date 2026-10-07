@@ -54,7 +54,14 @@ type CurrentProduct = {
   nameEng: string;
   longDescEng: string;
   stockQty: number;
-  priceNet: number;
+  /** <iaiext:omnibus_price_wholesale> — the authoritative wholesale price. */
+  omniPriceNet: number;
+  /** Fallback only: the highest <size><price> seen, used when no product
+   * has no omnibus wholesale price at all. Sizes are parsed before the
+   * omnibus block in document order, so these must stay separate rather
+   * than merged inline — otherwise a size price would wrongly block the
+   * real (later) omnibus value from ever being recorded. */
+  sizePriceNet: number;
 };
 
 type TextField = "name" | "longDesc" | null;
@@ -88,7 +95,8 @@ async function streamProducts(url: string): Promise<NormalizedProduct[]> {
           nameEng: "",
           longDescEng: "",
           stockQty: 0,
-          priceNet: 0,
+          omniPriceNet: 0,
+          sizePriceNet: 0,
         };
         break;
       case "category":
@@ -103,6 +111,12 @@ async function streamProducts(url: string): Promise<NormalizedProduct[]> {
       case "sizes":
         inSizes = true;
         break;
+      case "price":
+        if (current && inSizes) {
+          const net = Number(node.attributes.net);
+          if (Number.isFinite(net) && net > current.sizePriceNet) current.sizePriceNet = net;
+        }
+        break;
       case "stock":
         if (current && inSizes) {
           const qty = Number(node.attributes.quantity ?? 0);
@@ -113,9 +127,9 @@ async function streamProducts(url: string): Promise<NormalizedProduct[]> {
         inWholesaleBlock = true;
         break;
       case "iaiext:site":
-        if (current && inWholesaleBlock && current.priceNet === 0) {
+        if (current && inWholesaleBlock) {
           const net = Number(node.attributes.net);
-          if (Number.isFinite(net) && net > 0) current.priceNet = net;
+          if (Number.isFinite(net) && net > current.omniPriceNet) current.omniPriceNet = net;
         }
         break;
       case "name":
@@ -162,10 +176,11 @@ async function streamProducts(url: string): Promise<NormalizedProduct[]> {
     } else if (tag === "product") {
       const p = current;
       current = null;
+      const priceNet = p && p.omniPriceNet > 0 ? p.omniPriceNet : p?.sizePriceNet ?? 0;
       // Some listings carry no wholesale price anywhere in the feed (price
       // and stock both zero) — Maxy isn't actually offering them right now.
       // Importing at cost 0 would show them as free on the storefront.
-      if (!p || !p.sku || !p.nameEng || p.priceNet <= 0) return;
+      if (!p || !p.sku || !p.nameEng || priceNet <= 0) return;
 
       products.push({
         supplierSku: p.sku,
@@ -174,7 +189,7 @@ async function streamProducts(url: string): Promise<NormalizedProduct[]> {
         description: p.longDescEng ? stripHtml(p.longDescEng) : undefined,
         category: p.category || undefined,
         unit: p.unit,
-        costPriceCents: Math.round(p.priceNet * 100),
+        costPriceCents: Math.round(priceNet * 100),
         currency: p.currency,
         stockQty: p.stockQty,
         minOrderQty: 1,
