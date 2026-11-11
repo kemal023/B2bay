@@ -47,7 +47,7 @@ const nl = {
       { title: "Geverifieerde accounts", body: "Elk bedrijf wordt beoordeeld" },
       { title: "Snelle levering", body: "Direct uit voorraad, door heel de EU" },
       { title: "Factuur achteraf", body: "Eenvoudig per bank betalen" },
-      { title: "Persoonlijk contact", body: "info@cosmeweb.nl" },
+      { title: "Persoonlijk contact", body: "{email}" },
     ],
     catalogue: "Catalogus",
     ourRange: "Ons assortiment",
@@ -372,7 +372,7 @@ const nl = {
     ],
   },
   onboarding: {
-    welcome: "Welkom bij CosmeWeb",
+    welcome: "Welkom bij Cosme International",
     intro:
       "Koppel je account aan een bedrijf om te kunnen bestellen. Nieuwe bedrijven worden door ons team geverifieerd voordat afrekenen mogelijk is.",
     newCompany: "Nieuw bedrijf",
@@ -446,7 +446,7 @@ const en: Dictionary = {
       { title: "Verified accounts", body: "Every business is reviewed" },
       { title: "Fast delivery", body: "Straight from stock, across the EU" },
       { title: "Pay by invoice", body: "Simple bank transfer" },
-      { title: "Personal contact", body: "info@cosmeweb.nl" },
+      { title: "Personal contact", body: "{email}" },
     ],
     catalogue: "Catalogue",
     ourRange: "Our range",
@@ -770,7 +770,7 @@ const en: Dictionary = {
     ],
   },
   onboarding: {
-    welcome: "Welcome to CosmeWeb",
+    welcome: "Welcome to Cosme International",
     intro:
       "Link your account to a business to be able to order. New businesses are verified by our team before checkout is possible.",
     newCompany: "New business",

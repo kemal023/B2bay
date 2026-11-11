@@ -41,7 +41,7 @@ export const fr: Dictionary = {
       { title: "Comptes vérifiés", body: "Chaque entreprise est contrôlée" },
       { title: "Livraison rapide", body: "Directement du stock, dans toute l'UE" },
       { title: "Paiement sur facture", body: "Simple virement bancaire" },
-      { title: "Contact personnel", body: "info@cosmeweb.nl" },
+      { title: "Contact personnel", body: "{email}" },
     ],
     catalogue: "Catalogue",
     ourRange: "Notre gamme",
@@ -371,7 +371,7 @@ export const fr: Dictionary = {
     ],
   },
   onboarding: {
-    welcome: "Bienvenue sur CosmeWeb",
+    welcome: "Bienvenue sur Cosme International",
     intro:
       "Associez votre compte à une entreprise pour pouvoir commander. Les nouvelles entreprises sont vérifiées par notre équipe avant toute commande.",
     newCompany: "Nouvelle entreprise",

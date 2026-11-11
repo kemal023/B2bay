@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gte, ilike, lte, or, sql, type SQL } from "drizzle-orm";
+import { cache } from "react";
 import { getDb } from "@/db";
 import { products } from "@/db/schema";
 import { getCatalogRules, sellableConditions } from "@/lib/rules";
@@ -115,13 +116,16 @@ export async function listProducts(opts: ListOptions = {}) {
   };
 }
 
-export async function getProduct(id: string) {
+/** Cached per request: the product page and its metadata share one query. */
+export const getProduct = cache(async (id: string) => {
+  // Not a UUID: no query (Postgres would reject the cast anyway).
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return undefined;
   const db = getDb();
   const rules = await getCatalogRules();
   return db.query.products.findFirst({
     where: and(eq(products.id, id), ...sellableConditions(rules)),
   });
-}
+});
 
 /** `category` is the stable key used in URLs; the others are its translated labels. */
 export type CategorySummary = {

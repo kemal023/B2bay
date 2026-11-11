@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n/config";
+import { FALLBACK_EMAIL, SHOP_NAME } from "@/lib/brand";
 import type { CompanyDetails } from "@/lib/invoicing";
 
 /**
@@ -24,7 +25,7 @@ function sellerLine(s: CompanyDetails): string {
 }
 
 export function termsDoc(locale: Locale, s: CompanyDetails, freeShippingFrom: string | null): LegalDoc {
-  const name = s.legalName || "CosmeWeb";
+  const name = s.legalName || SHOP_NAME;
   const days = s.paymentTermDays;
 
   if (locale !== "nl") {
@@ -195,7 +196,7 @@ export function termsDoc(locale: Locale, s: CompanyDetails, freeShippingFrom: st
 }
 
 export function privacyDoc(locale: Locale, s: CompanyDetails): LegalDoc {
-  const contact = s.email || "info@cosmeweb.nl";
+  const contact = s.email || FALLBACK_EMAIL;
 
   if (locale !== "nl") {
     return {

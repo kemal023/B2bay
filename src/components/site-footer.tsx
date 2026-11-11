@@ -2,14 +2,16 @@ import Link from "next/link";
 import { FileText, Mail, ShieldCheck, Truck } from "lucide-react";
 import { SiteLogo } from "@/components/site-logo";
 import { getDictionary } from "@/lib/i18n/server";
+import { fmt } from "@/lib/i18n/dictionaries";
 import { getCompanyDetails } from "@/lib/invoicing";
+import { FALLBACK_EMAIL, SHOP_NAME } from "@/lib/brand";
 
 const TRUST_ICONS = [ShieldCheck, Truck, FileText, Mail];
 
 export async function SiteFooter() {
   const [{ t }, seller] = await Promise.all([getDictionary(), getCompanyDetails()]);
   const f = t.footer;
-  const email = seller.email || "info@cosmeweb.nl";
+  const email = seller.email || FALLBACK_EMAIL;
   return (
     <footer className="mt-auto border-t border-border bg-muted/30">
       <div className="mx-auto grid max-w-7xl gap-6 border-b border-border px-4 py-8 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
@@ -22,7 +24,7 @@ export async function SiteFooter() {
             </span>
             <div className="min-w-0">
               <div className="text-sm font-medium">{title}</div>
-              <div className="truncate text-xs text-muted-foreground">{body}</div>
+              <div className="truncate text-xs text-muted-foreground">{fmt(body, { email })}</div>
             </div>
           </div>
           );
@@ -114,7 +116,7 @@ export async function SiteFooter() {
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-5 text-xs text-muted-foreground sm:px-6">
           <span className="flex flex-wrap gap-x-4 gap-y-1">
-            <span>© {new Date().getFullYear()} {seller.legalName || "CosmeWeb"}. {f.rights}</span>
+            <span>© {new Date().getFullYear()} {seller.legalName || SHOP_NAME}. {f.rights}</span>
             <Link href="/terms" className="hover:text-foreground">{t.legal.terms}</Link>
             <Link href="/privacy" className="hover:text-foreground">{t.legal.privacy}</Link>
           </span>

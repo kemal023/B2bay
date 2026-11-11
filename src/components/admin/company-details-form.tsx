@@ -63,7 +63,7 @@ export function CompanyDetailsForm({ details }: { details: CompanyDetails }) {
       <div>
         <h3 className="text-sm font-medium">Bedrijf</h3>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Field name="legalName" label="Bedrijfsnaam" defaultValue={details.legalName} placeholder="CosmeWeb B.V." required />
+          <Field name="legalName" label="Bedrijfsnaam" defaultValue={details.legalName} placeholder="Cosme International B.V." required />
           <Field name="email" label="E-mailadres" defaultValue={details.email} placeholder="info@cosmeweb.nl" type="email" />
           <Field name="addressLine" label="Adres" defaultValue={details.addressLine} placeholder="Straatnaam 12" required />
           <Field name="phone" label="Telefoonnummer" defaultValue={details.phone} placeholder="+31 6 12345678" />

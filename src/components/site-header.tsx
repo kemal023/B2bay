@@ -13,6 +13,8 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { fmt } from "@/lib/i18n/dictionaries";
 import { formatPriceCents } from "@/lib/format";
 import { getShippingSettings } from "@/lib/shipping";
+import { getCompanyDetails } from "@/lib/invoicing";
+import { FALLBACK_EMAIL } from "@/lib/brand";
 import {
   BadgeCheck,
   LayoutDashboard,
@@ -25,12 +27,14 @@ import {
 const NAV_CATEGORY_COUNT = 6;
 
 export async function SiteHeader() {
-  const [user, categories, { locale, t }, shipping] = await Promise.all([
+  const [user, categories, { locale, t }, shipping, seller] = await Promise.all([
     getAppUser(),
     listCategorySummaries(),
     getDictionary(),
     getShippingSettings(),
+    getCompanyDetails(),
   ]);
+  const contactEmail = seller.email || FALLBACK_EMAIL;
   const navCategories = categories
     .slice(0, NAV_CATEGORY_COUNT)
     .map((c) => ({ value: c.category, label: localizedCategory(c, locale) ?? c.category }))
@@ -63,8 +67,8 @@ export async function SiteHeader() {
             </span>
           </div>
           <div className="flex items-center gap-4">
-            <a href="mailto:info@cosmeweb.nl" className="transition-colors hover:text-foreground">
-              info@cosmeweb.nl
+            <a href={`mailto:${contactEmail}`} className="transition-colors hover:text-foreground">
+              {contactEmail}
             </a>
             <LanguageSwitcher />
           </div>

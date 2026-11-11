@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { getLocale } from "@/lib/i18n/server";
 import "./globals.css";
+import { SHOP_NAME } from "@/lib/brand";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,7 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CosmeWeb — Groothandel voor professionals",
+  metadataBase: new URL(process.env.APP_URL ?? "http://localhost:3003"),
+  title: {
+    default: `${SHOP_NAME} — Groothandel voor professionals`,
+    template: `%s | ${SHOP_NAME}`,
+  },
   description:
     "B2B-webshop voor zakelijke inkoop: bestel je volledige assortiment via één account, met duidelijke facturatie achteraf.",
 };

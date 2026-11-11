@@ -41,7 +41,7 @@ export const de: Dictionary = {
       { title: "Geprüfte Konten", body: "Jedes Unternehmen wird geprüft" },
       { title: "Schnelle Lieferung", body: "Direkt ab Lager, in die ganze EU" },
       { title: "Kauf auf Rechnung", body: "Einfach per Überweisung zahlen" },
-      { title: "Persönlicher Kontakt", body: "info@cosmeweb.nl" },
+      { title: "Persönlicher Kontakt", body: "{email}" },
     ],
     catalogue: "Katalog",
     ourRange: "Unser Sortiment",
@@ -370,7 +370,7 @@ export const de: Dictionary = {
     ],
   },
   onboarding: {
-    welcome: "Willkommen bei CosmeWeb",
+    welcome: "Willkommen bei Cosme International",
     intro:
       "Verknüpfen Sie Ihr Konto mit einem Unternehmen, um bestellen zu können. Neue Unternehmen werden von unserem Team geprüft, bevor eine Bestellung möglich ist.",
     newCompany: "Neues Unternehmen",

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,33 @@ import {
 import { FileCheck2, ImageOff, Languages, Lock, PackageCheck, Truck } from "lucide-react";
 
 const USP_ICONS = [PackageCheck, Truck, FileCheck2];
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const [{ id }, { locale }] = await Promise.all([params, getDictionary()]);
+  const product = await getProduct(id);
+  if (!product) return {};
+  const name = localizedName(product, locale);
+  const description = localizedDescription(product, locale).text;
+  const category = localizedCategory(product, locale);
+  const summary = (description ?? [name, category, product.ean && `EAN ${product.ean}`].filter(Boolean).join(" · "))
+    .replace(/s+/g, " ")
+    .slice(0, 160);
+  return {
+    title: name,
+    description: summary,
+    alternates: { canonical: `/products/${product.id}` },
+    openGraph: {
+      title: name,
+      description: summary,
+      type: "website",
+      ...(product.imageUrl ? { images: [{ url: product.imageUrl }] } : {}),
+    },
+  };
+}
 
 export default async function ProductDetailPage({
   params,

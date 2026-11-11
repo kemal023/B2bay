@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,22 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
+
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; category?: string }>;
+}): Promise<Metadata> {
+  const [{ q, category }, { locale, t }] = await Promise.all([searchParams, getDictionary()]);
+  if (category) {
+    const match = (await listCategorySummaries("name")).find((c) => c.category === category);
+    const label = match ? (localizedCategory(match, locale) ?? category) : category;
+    return { title: label, alternates: { canonical: `/products?category=${encodeURIComponent(category)}` } };
+  }
+  // Search result pages are thin duplicates of the catalogue: keep them out of the index.
+  if (q) return { title: `${t.catalog.searchResults}: ${q}`, robots: { index: false } };
+  return { title: t.catalog.title, alternates: { canonical: "/products" } };
+}
 
 export default async function ProductsPage({
   searchParams,

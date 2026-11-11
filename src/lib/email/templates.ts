@@ -1,7 +1,9 @@
 import type { Locale } from "@/lib/i18n/config";
 import { appUrl, type Email } from "@/lib/email/send";
 
-export const SHOP_NAME = "CosmeWeb";
+import { SHOP_NAME } from "@/lib/brand";
+
+export { SHOP_NAME };
 
 function escape(value: string): string {
   return value
