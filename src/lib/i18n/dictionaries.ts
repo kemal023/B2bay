@@ -106,6 +106,16 @@ const nl = {
     volumeFrom: "Vanaf {qty} {unit}",
     perUnit: "per {unit}",
   },
+  favorites: {
+    title: "Favorieten",
+    intro: "Producten die je vaak bestelt, gedeeld met iedereen in je bedrijf.",
+    add: "Toevoegen aan favorieten",
+    remove: "Uit favorieten verwijderen",
+    empty: "Nog geen favorieten. Klik op het hartje bij een product om het hier te bewaren.",
+    addAll: "Alles in winkelmandje",
+    added: "Toegevoegd aan favorieten",
+    removed: "Verwijderd uit favorieten",
+  },
   legal: {
     terms: "Algemene voorwaarden",
     privacy: "Privacyverklaring",
@@ -482,6 +492,16 @@ const en: Dictionary = {
     volumeTitle: "Volume discount",
     volumeFrom: "From {qty} {unit}",
     perUnit: "per {unit}",
+  },
+  favorites: {
+    title: "Favourites",
+    intro: "Products you order often, shared with everyone in your company.",
+    add: "Add to favourites",
+    remove: "Remove from favourites",
+    empty: "No favourites yet. Click the heart on a product to keep it here.",
+    addAll: "Add all to cart",
+    added: "Added to favourites",
+    removed: "Removed from favourites",
   },
   legal: {
     terms: "Terms and conditions",

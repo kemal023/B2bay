@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { cartItems, orders, products } from "@/db/schema";
+import { cartItems, favorites, orders, products } from "@/db/schema";
 import { getAppUserWithCompany } from "@/lib/auth";
 import { getCatalogRules, sellableConditions } from "@/lib/rules";
 import { getDictionary } from "@/lib/i18n/server";
@@ -269,6 +269,45 @@ export async function quickOrder(text: string): Promise<BulkResult> {
 
     revalidatePath("/cart");
     return { ok: true, message: fmt(t.quickOrder.added, { count: result.added.length }), notes };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : t.common.error };
+  }
+}
+
+/** Adds or removes a product from the company's favourites; returns the new state. */
+export async function toggleFavorite(
+  productId: string,
+): Promise<{ ok: true; favorite: boolean } | { ok: false; error: string }> {
+  try {
+    const user = await requireCompany();
+    const db = getDb();
+    const where = and(eq(favorites.companyId, user.company!.id), eq(favorites.productId, productId));
+    const removed = await db.delete(favorites).where(where).returning({ id: favorites.productId });
+    if (removed.length === 0) {
+      await db.insert(favorites).values({ companyId: user.company!.id, productId }).onConflictDoNothing();
+    }
+    revalidatePath("/dashboard/favorites");
+    return { ok: true, favorite: removed.length === 0 };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Onbekende fout." };
+  }
+}
+
+/** Every favourite that is sellable right now, at its minimum order quantity. */
+export async function addFavoritesToCart(): Promise<BulkResult> {
+  const { t } = await getDictionary();
+  try {
+    const user = await requireApprovedCompany();
+    const rows = await getDb().query.favorites.findMany({
+      where: eq(favorites.companyId, user.company!.id),
+    });
+    const result = await addLinesToCart(
+      user.company!.id,
+      rows.map((r) => ({ productId: r.productId, quantity: 1 })),
+    );
+    if (result.added.length === 0) return { ok: false, error: t.reorder.none };
+    revalidatePath("/cart");
+    return { ok: true, message: fmt(t.quickOrder.added, { count: result.added.length }), notes: [] };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : t.common.error };
   }

@@ -104,6 +104,21 @@ export const sessions = pgTable("sessions", {
     .defaultNow(),
 }, (t) => [uniqueIndex("sessions_token_hash_idx").on(t.tokenHash)]);
 
+/** A product a company keeps on its favourites list (shared by its users). */
+export const favorites = pgTable(
+  "favorites",
+  {
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("favorites_company_product_idx").on(t.companyId, t.productId)],
+);
+
 /** A place a company wants goods delivered — e.g. one per branch. */
 export const deliveryAddresses = pgTable("delivery_addresses", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -373,6 +388,11 @@ export const orderItems = pgTable("order_items", {
   unitPriceCents: integer("unit_price_cents").notNull(),
   quantity: integer("quantity").notNull(),
 });
+
+export const favoritesRelations = relations(favorites, ({ one }) => ({
+  company: one(companies, { fields: [favorites.companyId], references: [companies.id] }),
+  product: one(products, { fields: [favorites.productId], references: [products.id] }),
+}));
 
 export const deliveryAddressesRelations = relations(deliveryAddresses, ({ one }) => ({
   company: one(companies, { fields: [deliveryAddresses.companyId], references: [companies.id] }),

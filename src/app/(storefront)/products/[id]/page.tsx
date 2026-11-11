@@ -10,6 +10,10 @@ import { priceAccessFor } from "@/lib/price-visibility";
 import { formatPriceCents } from "@/lib/format";
 import { getDictionary } from "@/lib/i18n/server";
 import { getVolumeTiers, unitPriceCents } from "@/lib/pricing";
+import { FavoriteButton } from "@/components/bulk-cart-actions";
+import { and, eq } from "drizzle-orm";
+import { getDb } from "@/db";
+import { favorites } from "@/db/schema";
 import { intlLocale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/dictionaries";
 import {
@@ -40,6 +44,13 @@ export default async function ProductDetailPage({
   const discount = user?.role === "platform_admin" ? 0 : (user?.company?.discountPercent ?? 0);
   const pricing = { companyDiscountPercent: discount, tiers: priceAccess === "visible" ? await getVolumeTiers() : [] };
   const yourPrice = unitPriceCents(product.priceCents, 1, pricing);
+  const isFavorite = user?.company
+    ? Boolean(
+        await getDb().query.favorites.findFirst({
+          where: and(eq(favorites.companyId, user.company.id), eq(favorites.productId, product.id)),
+        }),
+      )
+    : false;
   const showPrice = priceAccess === "visible";
   const p = t.product;
   const num = (n: number) => n.toLocaleString(intlLocale(locale));
@@ -148,7 +159,10 @@ export default async function ProductDetailPage({
               {category}
             </Badge>
           )}
-          <h1 className="text-2xl font-semibold leading-snug tracking-tight sm:text-3xl">{name}</h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-2xl font-semibold leading-snug tracking-tight sm:text-3xl">{name}</h1>
+            {user?.company && <FavoriteButton productId={product.id} initial={isFavorite} />}
+          </div>
 
           <div className="mt-6 rounded-xl border border-border bg-card p-5 shadow-sm">
             {showPrice ? (

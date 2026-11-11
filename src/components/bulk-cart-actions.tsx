@@ -8,8 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useI18n } from "@/components/i18n-provider";
-import { quickOrder, reorder, type BulkResult } from "@/lib/actions/cart";
-import { Loader2, RotateCcw, ShoppingCart } from "lucide-react";
+import {
+  addFavoritesToCart,
+  quickOrder,
+  reorder,
+  toggleFavorite,
+  type BulkResult,
+} from "@/lib/actions/cart";
+import { Heart, Loader2, RotateCcw, ShoppingCart } from "lucide-react";
 
 export function ReorderButton({ orderId }: { orderId: string }) {
   const { t } = useI18n();
@@ -84,5 +90,56 @@ export function QuickOrderForm() {
         )}
       </div>
     </form>
+  );
+}
+
+export function FavoriteButton({ productId, initial }: { productId: string; initial: boolean }) {
+  const { t } = useI18n();
+  const [favorite, setFavorite] = useState(initial);
+  const [isPending, startTransition] = useTransition();
+  const label = favorite ? t.favorites.remove : t.favorites.add;
+
+  return (
+    <Button
+      variant="outline"
+      size="icon"
+      aria-label={label}
+      title={label}
+      aria-pressed={favorite}
+      disabled={isPending}
+      onClick={() =>
+        startTransition(async () => {
+          const result = await toggleFavorite(productId);
+          if (!result.ok) return void toast.error(result.error);
+          setFavorite(result.favorite);
+          toast.success(result.favorite ? t.favorites.added : t.favorites.removed);
+        })
+      }
+    >
+      <Heart className={`h-4 w-4 ${favorite ? "fill-rose-500 text-rose-500" : ""}`} />
+    </Button>
+  );
+}
+
+export function AddFavoritesToCartButton() {
+  const { t } = useI18n();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  return (
+    <Button
+      disabled={isPending}
+      onClick={() =>
+        startTransition(async () => {
+          const result = await addFavoritesToCart();
+          if (!result.ok) return void toast.error(result.error);
+          toast.success(result.message, {
+            action: { label: t.quickOrder.toCart, onClick: () => router.push("/cart") },
+          });
+        })
+      }
+    >
+      {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingCart className="h-4 w-4" />}
+      {t.favorites.addAll}
+    </Button>
   );
 }
