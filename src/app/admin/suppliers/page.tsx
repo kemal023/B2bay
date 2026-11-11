@@ -8,6 +8,7 @@ import { SupplierRowActions } from "@/components/admin/supplier-row-actions";
 import { AdminPageHeader, AdminTableShell } from "@/components/admin/page-header";
 import { formatDate } from "@/lib/format";
 import { Plug } from "lucide-react";
+import { SupplierLanguageSelect } from "@/components/admin/supplier-language-select";
 
 // A supplier sync (via the "Sync" button's server action) can take a while
 // for large feeds — e.g. Annapol's ~70k-product XML catalog.
@@ -18,12 +19,19 @@ export default async function AdminSuppliersPage() {
   const [allSuppliers, productCounts] = await Promise.all([
     db.query.suppliers.findMany({ orderBy: (t, { desc }) => desc(t.createdAt) }),
     db
-      .select({ supplierId: products.supplierId, count: sql<number>`count(*)::int` })
+      .select({
+        supplierId: products.supplierId,
+        count: sql<number>`count(*)::int`,
+        translated: sql<number>`count(*) filter (where ${products.nameTrHash} is not null and ${products.descTrHash} is not null)::int`,
+        translatedExtra: sql<number>`count(*) filter (where ${products.nameDe} is not null and ${products.nameFr} is not null)::int`,
+      })
       .from(products)
       .where(eq(products.active, true))
       .groupBy(products.supplierId),
   ]);
   const countBySupplier = new Map(productCounts.map((r) => [r.supplierId, r.count]));
+  const statsBySupplier = new Map(productCounts.map((r) => [r.supplierId, r]));
+  const pct = (part: number, whole: number) => `${whole ? Math.floor((part / whole) * 100) : 100}%`;
 
   return (
     <div>
@@ -53,6 +61,7 @@ export default async function AdminSuppliersPage() {
                 <TableHead>Leverancier</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Producten</TableHead>
+                <TableHead>Taal &amp; vertaling</TableHead>
                 <TableHead>Laatste sync</TableHead>
                 <TableHead className="text-right">Acties</TableHead>
               </TableRow>
@@ -76,6 +85,18 @@ export default async function AdminSuppliersPage() {
                   </TableCell>
                   <TableCell className="text-right font-medium tabular-nums">
                     {(countBySupplier.get(s.id) ?? 0).toLocaleString("nl-NL")}
+                  </TableCell>
+                  <TableCell>
+                    <SupplierLanguageSelect id={s.id} value={s.sourceLanguage} />
+                    {(() => {
+                      const st = statsBySupplier.get(s.id);
+                      if (!st?.count) return null;
+                      return (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Vertaald: NL/EN {pct(st.translated, st.count)} · DE/FR {pct(st.translatedExtra, st.count)}
+                        </p>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {s.lastSyncedAt ? formatDate(s.lastSyncedAt) : "Nog niet gesynchroniseerd"}

@@ -25,6 +25,8 @@ import { Separator } from "@/components/ui/separator";
 import { createSupplier } from "@/lib/actions/suppliers";
 import { ADAPTER_TYPE_OPTIONS } from "@/lib/suppliers/registry";
 import { Plug, Plus } from "lucide-react";
+import { selectClassName } from "@/components/billing-fields";
+import { SOURCE_LANGUAGES } from "@/lib/source-languages";
 
 const fieldSpecs: { key: string; label: string; defaultValue: string }[] = [
   { key: "fieldSku", label: "SKU / artikelnummer", defaultValue: "sku" },
@@ -97,6 +99,20 @@ export function SupplierForm() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sourceLanguage">Taal van de productteksten</Label>
+              <select id="sourceLanguage" name="sourceLanguage" defaultValue="auto" className={selectClassName}>
+                {SOURCE_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Namen, categorieën en omschrijvingen worden automatisch vertaald naar NL, EN, DE en FR.
+                &ldquo;Automatisch&rdquo; herkent de taal per product.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="syncIntervalMinutes">Synchronisatie-interval (minuten)</Label>

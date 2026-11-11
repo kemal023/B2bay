@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { suppliers } from "@/db/schema";
+import { products, suppliers } from "@/db/schema";
+import { isSourceLanguage } from "@/lib/source-languages";
 import { isPlatformAdmin } from "@/lib/auth";
 import { syncSupplier } from "@/lib/suppliers/sync";
 import type { GenericRestConfig } from "@/lib/suppliers/generic-rest";
@@ -38,8 +39,12 @@ export async function createSupplier(formData: FormData): Promise<ActionResult> 
 
     if (!name) return { ok: false, error: "Naam is verplicht." };
 
+    const sourceLanguage = String(formData.get("sourceLanguage") ?? "auto");
+    if (!isSourceLanguage(sourceLanguage)) return { ok: false, error: "Onbekende taal." };
+
     const shared = {
       name,
+      sourceLanguage,
       slug: slugify(name) || crypto.randomUUID(),
       syncIntervalMinutes: Number.isFinite(syncIntervalMinutes) ? syncIntervalMinutes : 60,
       defaultMarkupPercent: Number.isFinite(defaultMarkupPercent) ? defaultMarkupPercent : 30,
@@ -163,6 +168,30 @@ export async function triggerSupplierSync(id: string): Promise<
 
     if (!result.ok) return { ok: false, error: result.error ?? "Synchronisatie mislukt." };
     return { ok: true, productsUpserted: result.productsUpserted };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Onbekende fout." };
+  }
+}
+
+/**
+ * Changes the language of a supplier's texts. The translator sees the new
+ * language on its next pass and redoes that supplier's translations.
+ */
+export async function setSupplierLanguage(id: string, language: string): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    if (!isSourceLanguage(language)) return { ok: false, error: "Onbekende taal." };
+    const db = getDb();
+    await db.update(suppliers).set({ sourceLanguage: language }).where(eq(suppliers.id, id));
+    if (language === "auto") {
+      // Detection runs per product for rows without a language.
+      await db
+        .update(products)
+        .set({ sourceLang: null, nameTrHash: null, catTrHash: null, descTrHash: null })
+        .where(eq(products.supplierId, id));
+    }
+    revalidatePath("/admin/suppliers");
+    return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Onbekende fout." };
   }
