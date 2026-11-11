@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, lte, or, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/db";
 import { products } from "@/db/schema";
 import { getCatalogRules, sellableConditions } from "@/lib/rules";
@@ -25,58 +25,87 @@ export function isSortKey(value: string | undefined): value is SortKey {
   return value !== undefined && value in SORT_OPTIONS;
 }
 
-export async function listProducts(
-  opts: { q?: string; category?: string; page?: number; sort?: SortKey; locale?: Locale } = {},
-) {
+export type ListOptions = {
+  q?: string;
+  category?: string;
+  page?: number;
+  sort?: SortKey;
+  locale?: Locale;
+  /** List-price bounds in cents (the caller converts from the customer's own price). */
+  minPriceCents?: number;
+  maxPriceCents?: number;
+};
+
+/** A word that literally appears in the name, category, EAN or item number. */
+function exactWordMatch(word: string): SQL {
+  const term = `%${word}%`;
+  // Both languages, so a Dutch search finds a product whose Dutch name
+  // isn't ready yet, and an English one still works on the NL site.
+  return or(
+    ilike(products.name, term),
+    ilike(products.nameNl, term),
+    ilike(products.category, term),
+    ilike(products.categoryNl, term),
+    ilike(products.ean, term),
+    ilike(products.supplierSku, term),
+  )!;
+}
+
+/** A word that resembles a word in the name — catches typos ("shampo"). */
+function fuzzyWordMatch(word: string): SQL {
+  return sql`(${word} <% ${products.name} OR ${word} <% ${products.nameNl})`;
+}
+
+/** How well the whole query matches the name, for "most relevant first". */
+function relevance(q: string): SQL {
+  return sql`greatest(word_similarity(${q}, ${products.name}), word_similarity(${q}, coalesce(${products.nameNl}, '')))`;
+}
+
+export async function listProducts(opts: ListOptions = {}) {
   const db = getDb();
-  const conditions = sellableConditions(await getCatalogRules());
+  const base = sellableConditions(await getCatalogRules());
+  if (opts.category) base.push(eq(products.category, opts.category));
+  if (opts.minPriceCents != null) base.push(gte(products.priceCents, opts.minPriceCents));
+  if (opts.maxPriceCents != null) base.push(lte(products.priceCents, opts.maxPriceCents));
 
-  if (opts.q) {
-    // Match each word independently (not as one literal phrase) so word
-    // order/adjacency in the query doesn't matter — "A4 paper" should find
-    // "A4 80g cardboard photocopy paper - 5 reams".
-    const words = opts.q.trim().split(/\s+/).filter(Boolean);
-    for (const word of words) {
-      const term = `%${word}%`;
-      conditions.push(
-        // Both languages, so a Dutch search finds a product whose Dutch
-        // name isn't ready yet, and an English one still works on the NL site.
-        or(
-          ilike(products.name, term),
-          ilike(products.nameNl, term),
-          ilike(products.category, term),
-          ilike(products.categoryNl, term),
-          ilike(products.ean, term),
-        )!,
-      );
-    }
-  }
-  if (opts.category) {
-    conditions.push(eq(products.category, opts.category));
-  }
-
+  // Match each word independently (not as one literal phrase) so word
+  // order/adjacency in the query doesn't matter — "A4 paper" should find
+  // "A4 80g cardboard photocopy paper - 5 reams".
+  const q = opts.q?.trim() ?? "";
+  const words = q.split(/\s+/).filter(Boolean);
   const page = Math.max(1, opts.page ?? 1);
-  const where = and(...conditions);
+  const sortKey = opts.sort ?? "relevant";
 
-  const sort = SORT_OPTIONS[opts.sort ?? "relevant"];
+  const run = async (match: (word: string) => SQL) => {
+    const where = and(...base, ...words.map(match));
+    const orderBy =
+      q && sortKey === "relevant"
+        ? [desc(relevance(q)), desc(products.stockQty)]
+        : SORT_OPTIONS[sortKey].orderBy(opts.locale ?? "nl");
+    const [rows, totalRow] = await Promise.all([
+      db.query.products.findMany({
+        where,
+        orderBy,
+        limit: PRODUCTS_PAGE_SIZE,
+        offset: (page - 1) * PRODUCTS_PAGE_SIZE,
+      }),
+      db.select({ count: sql<number>`count(*)::int` }).from(products).where(where),
+    ]);
+    return { rows, total: totalRow[0]?.count ?? 0 };
+  };
 
-  const [rows, totalRow] = await Promise.all([
-    db.query.products.findMany({
-      where,
-      orderBy: sort.orderBy(opts.locale ?? "nl"),
-      limit: PRODUCTS_PAGE_SIZE,
-      offset: (page - 1) * PRODUCTS_PAGE_SIZE,
-    }),
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(products)
-      .where(where),
-  ]);
+  let { rows, total } = await run(exactWordMatch);
+  // Nothing found literally: try again tolerating typos, and say so.
+  let fuzzy = false;
+  if (total === 0 && words.some((w) => w.length >= 3)) {
+    ({ rows, total } = await run((w) => (w.length >= 3 ? fuzzyWordMatch(w) : exactWordMatch(w))));
+    fuzzy = total > 0;
+  }
 
-  const total = totalRow[0]?.count ?? 0;
   return {
     products: rows,
     total,
+    fuzzy,
     page,
     totalPages: Math.max(1, Math.ceil(total / PRODUCTS_PAGE_SIZE)),
   };

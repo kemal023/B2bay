@@ -170,6 +170,11 @@ const nl = {
     ctaSecondary: "Eerst rondkijken",
   },
   catalog: {
+    fuzzyNote: "Geen exacte treffers. Dit komt er het dichtst bij:",
+    priceFilter: "Prijs (excl. btw)",
+    priceMin: "Van",
+    priceMax: "Tot",
+    priceChip: "€{min} – €{max}",
     title: "Productcatalogus",
     searchResults: "Zoekresultaten",
     noneFound: "Geen producten gevonden",
@@ -557,6 +562,11 @@ const en: Dictionary = {
     ctaSecondary: "Look around first",
   },
   catalog: {
+    fuzzyNote: "No exact matches. These come closest:",
+    priceFilter: "Price (excl. VAT)",
+    priceMin: "From",
+    priceMax: "To",
+    priceChip: "€{min} – €{max}",
     title: "Product catalogue",
     searchResults: "Search results",
     noneFound: "No products found",

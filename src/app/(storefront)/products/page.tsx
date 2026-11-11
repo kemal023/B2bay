@@ -27,18 +27,48 @@ import {
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string; page?: string; sort?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    category?: string;
+    page?: string;
+    sort?: string;
+    min?: string;
+    max?: string;
+  }>;
 }) {
-  const { q, category, page: pageParam, sort: sortParam } = await searchParams;
+  const { q, category, page: pageParam, sort: sortParam, min, max } = await searchParams;
   const page = Math.max(1, Number(pageParam) || 1);
   const sort: SortKey = isSortKey(sortParam) ? sortParam : "relevant";
 
   const { locale, t } = await getDictionary();
   const c = t.catalog;
-  const [{ products, total, totalPages }, categorySummaries, user] = await Promise.all([
-    listProducts({ q, category, page, sort, locale }),
+  const user = await getAppUserWithCompany();
+  const priceAccess = priceAccessFor(user);
+  // Staff see list prices; a customer sees its own price agreement.
+  const discount = user?.role === "platform_admin" ? 0 : (user?.company?.discountPercent ?? 0);
+  const showPrice = priceAccess === "visible";
+
+  // The price filter is in the customer's own prices; the catalogue stores
+  // list prices, so convert the bounds. Ignored for visitors without prices.
+  const euro = (v?: string) => {
+    const n = Number(String(v ?? "").replace(",", "."));
+    return v && Number.isFinite(n) && n >= 0 ? n : undefined;
+  };
+  const minEuro = showPrice ? euro(min) : undefined;
+  const maxEuro = showPrice ? euro(max) : undefined;
+  const toList = (e: number) => Math.round((e * 100) / (1 - discount / 100));
+
+  const [{ products, total, totalPages, fuzzy }, categorySummaries] = await Promise.all([
+    listProducts({
+      q,
+      category,
+      page,
+      sort,
+      locale,
+      minPriceCents: minEuro != null ? toList(minEuro) : undefined,
+      maxPriceCents: maxEuro != null ? toList(maxEuro) : undefined,
+    }),
     listCategorySummaries("name"),
-    getAppUserWithCompany(),
   ]);
   const num = (n: number) => n.toLocaleString(intlLocale(locale));
   // URLs keep the stable English key; visitors see the label in their language.
@@ -48,11 +78,6 @@ export default async function ProductsPage({
   const categoryLabel = category
     ? (categories.find((cat) => cat.category === category)?.label ?? category)
     : null;
-  const priceAccess = priceAccessFor(user);
-  // Staff see list prices; a customer sees its own price agreement.
-  const discount = user?.role === "platform_admin" ? 0 : (user?.company?.discountPercent ?? 0);
-  const showPrice = priceAccess === "visible";
-
   // Sorting by price would reveal the price order to visitors who aren't
   // allowed to see the prices themselves.
   const sortOptions = Object.entries(SORT_OPTIONS).filter(
@@ -61,7 +86,14 @@ export default async function ProductsPage({
 
   function hrefWith(overrides: Record<string, string | undefined>) {
     const params = new URLSearchParams();
-    const merged = { q, category, sort: sort === "relevant" ? undefined : sort, ...overrides };
+    const merged = {
+      q,
+      category,
+      sort: sort === "relevant" ? undefined : sort,
+      min: minEuro != null ? String(minEuro) : undefined,
+      max: maxEuro != null ? String(maxEuro) : undefined,
+      ...overrides,
+    };
     for (const [key, value] of Object.entries(merged)) {
       if (value) params.set(key, value);
     }
@@ -69,7 +101,8 @@ export default async function ProductsPage({
     return qs ? `/products?${qs}` : "/products";
   }
 
-  const hasFilters = Boolean(q || category);
+  const hasPrice = minEuro != null || maxEuro != null;
+  const hasFilters = Boolean(q || category || hasPrice);
   const firstResult = (page - 1) * 24 + 1;
   const lastResult = Math.min(page * 24, total);
 
@@ -108,6 +141,7 @@ export default async function ProductsPage({
                 <span className="font-medium text-foreground">&ldquo;{q}&rdquo;</span>
               </>
             )}
+            {fuzzy && <span className="mt-1 block text-amber-700 dark:text-amber-400">{c.fuzzyNote}</span>}
           </p>
         </div>
 
@@ -164,6 +198,42 @@ export default async function ProductsPage({
                 );
               })}
             </nav>
+
+            {showPrice && (
+              <form action="/products" className="mt-6 border-t border-border pt-5">
+                <h2 className="text-sm font-semibold">{c.priceFilter}</h2>
+                {q && <input type="hidden" name="q" value={q} />}
+                {category && <input type="hidden" name="category" value={category} />}
+                {sort !== "relevant" && <input type="hidden" name="sort" value={sort} />}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Input
+                    name="min"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder={c.priceMin}
+                    defaultValue={minEuro ?? ""}
+                    aria-label={c.priceMin}
+                    className="h-9"
+                  />
+                  <Input
+                    name="max"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    inputMode="decimal"
+                    placeholder={c.priceMax}
+                    defaultValue={maxEuro ?? ""}
+                    aria-label={c.priceMax}
+                    className="h-9"
+                  />
+                </div>
+                <Button type="submit" variant="outline" size="sm" className="mt-2 w-full">
+                  {c.apply}
+                </Button>
+              </form>
+            )}
           </div>
         </aside>
 
@@ -179,6 +249,15 @@ export default async function ProductsPage({
                       className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium transition-colors hover:bg-muted"
                     >
                       {categoryLabel}
+                      <X className="h-3 w-3" />
+                    </Link>
+                  )}
+                  {hasPrice && (
+                    <Link
+                      href={hrefWith({ min: undefined, max: undefined, page: undefined })}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium transition-colors hover:bg-muted"
+                    >
+                      {fmt(c.priceChip, { min: minEuro ?? 0, max: maxEuro ?? "∞" })}
                       <X className="h-3 w-3" />
                     </Link>
                   )}
