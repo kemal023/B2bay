@@ -12,6 +12,8 @@
  * seller's responsibility; this only applies the standard rule.
  */
 
+import { intlLocale, type Locale } from "@/lib/i18n/config";
+
 /** EU member states by ISO code, with the prefix VIES uses (Greece is EL). */
 export const EU_COUNTRIES = [
   { code: "AT", vies: "AT", nl: "Oostenrijk", en: "Austria" },
@@ -51,9 +53,15 @@ export function isEuCountry(code: string | null | undefined): code is CountryCod
   return EU_COUNTRIES.some((c) => c.code === code);
 }
 
-export function countryName(code: string | null | undefined, locale: "nl" | "en" = "nl"): string {
+export function countryName(code: string | null | undefined, locale: Locale = "nl"): string {
   const c = EU_COUNTRIES.find((x) => x.code === code);
-  return c ? c[locale] : (code ?? "");
+  if (!c) return code ?? "";
+  if (locale === "nl" || locale === "en") return c[locale];
+  try {
+    return new Intl.DisplayNames([intlLocale(locale)], { type: "region" }).of(c.code) ?? c.en;
+  } catch {
+    return c.en;
+  }
 }
 
 /** "de 123.456.789" → "DE123456789". */

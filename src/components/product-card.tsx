@@ -10,8 +10,12 @@ export type ProductCardProduct = {
   id: string;
   name: string;
   nameNl: string | null;
+  nameDe?: string | null;
+  nameFr?: string | null;
   category: string | null;
   categoryNl: string | null;
+  categoryDe?: string | null;
+  categoryFr?: string | null;
   imageUrl: string | null;
   priceCents: number;
   currency: string;

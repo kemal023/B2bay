@@ -1,8 +1,9 @@
 import type { DeliverySnapshot } from "@/lib/delivery";
 import { countryName } from "@/lib/vat";
+import type { Locale } from "@/lib/i18n/config";
 
 /** A delivery address as a few plain lines. */
-export function AddressBlock({ address, locale = "nl" }: { address: DeliverySnapshot; locale?: "nl" | "en" }) {
+export function AddressBlock({ address, locale = "nl" }: { address: DeliverySnapshot; locale?: Locale }) {
   return (
     <address className="text-sm not-italic leading-relaxed">
       <div className="font-medium">{address.label}</div>

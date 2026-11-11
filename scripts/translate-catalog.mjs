@@ -1,11 +1,12 @@
 /**
  * Translation service for the whole catalogue. Runs continuously as the
  * `translator` container (docker-compose.yml) and keeps every product's
- * name, category and description available in English and Dutch, whatever
- * language the supplier sends — including suppliers added later.
+ * name, category and description available in English and Dutch — and from
+ * the English also German and French — whatever language the supplier sends,
+ * including suppliers added later.
  *
  *   docker compose up -d translator            (normal operation)
- *   npx dotenv run -f .env.local -- node scripts/translate-catalog.mjs --once
+ *   npx dotenv -e .env.local -- node scripts/translate-catalog.mjs --once
  *
  * How it decides what to do:
  *  - Language: suppliers.source_language ("pl", "en", …) or, for "auto" and
@@ -219,7 +220,8 @@ async function translateNames() {
 
   await sql.query(
     `UPDATE products p SET
-       name = x.en, name_nl = x.nl, name_tr_hash = md5(x.en)
+       name = x.en, name_nl = x.nl, name_tr_hash = md5(x.en),
+       name_de = NULL, name_fr = NULL
      FROM unnest($1::uuid[], $2::text[], $3::text[]) AS x(id, en, nl)
      WHERE p.id = x.id`,
     [plans.map((p) => p.id), plans.map((p) => p.en), plans.map((p) => p.nl)],
@@ -270,7 +272,8 @@ async function translateCategories() {
           : en;
 
     await sql.query(
-      `UPDATE products p SET category = $4, category_nl = $5, cat_tr_hash = md5($4::text)
+      `UPDATE products p SET category = $4, category_nl = $5, cat_tr_hash = md5($4::text),
+         category_de = NULL, category_fr = NULL
        WHERE p.supplier_id IS NOT DISTINCT FROM $1
          AND p.source_category IS NOT DISTINCT FROM $2
          AND p.category = $3 AND p.customized = $6 AND p.cat_tr_hash IS NULL`,
@@ -357,10 +360,87 @@ async function translateDescriptions(priorityOnly) {
   await sql.query(
     `UPDATE products p SET
        description = x.en, description_nl = x.nl, translation_priority = NULL,
+       description_de = NULL, description_fr = NULL,
        desc_tr_hash = md5(coalesce(x.en, ''))
      FROM unnest($1::uuid[], $2::text[], $3::text[]) AS x(id, en, nl)
      WHERE p.id = x.id`,
     [plans.map((p) => p.id), plans.map((p) => p.en), plans.map((p) => p.nl)],
+  );
+  return rows.length;
+}
+
+// ---------------------------------------------------------------------------
+// German and French
+//
+// Translated from the final English, once the English/Dutch pass for that
+// field is done (its *_tr_hash is set). That pass resets these columns to
+// NULL whenever it rewrites the English, so NULL again means "to do". Until
+// then the storefront shows English. An admin's own wording (customized) is
+// in an unknown language and is copied rather than translated.
+// ---------------------------------------------------------------------------
+
+const EXTRA_LANGS = ["de", "fr"];
+
+async function translateExtraNames(lang) {
+  const rows = await sql.query(`
+    SELECT p.id, p.name, p.customized FROM products p
+    WHERE p.name_tr_hash IS NOT NULL AND p.name_${lang} IS NULL
+    ORDER BY p.active DESC, (p.stock_qty > 0) DESC
+    LIMIT ${NAME_BATCH}`);
+  if (rows.length === 0) return 0;
+
+  const translatable = rows.filter((r) => !r.customized && !isLikelyPolish(r.name));
+  const done = await translateTexts(translatable.map((r) => r.name), "en", lang);
+  await sql.query(
+    `UPDATE products p SET name_${lang} = x.t
+     FROM unnest($1::uuid[], $2::text[]) AS x(id, t) WHERE p.id = x.id`,
+    [rows.map((r) => r.id), rows.map((r) => done.get(r.name) ?? r.name)],
+  );
+  return rows.length;
+}
+
+async function translateExtraCategories(lang) {
+  const groups = await sql.query(`
+    SELECT DISTINCT p.category FROM products p
+    WHERE p.cat_tr_hash IS NOT NULL AND p.category IS NOT NULL AND p.category_${lang} IS NULL
+    LIMIT 50`);
+  if (groups.length === 0) return 0;
+
+  const cats = groups.map((g) => g.category);
+  const done = await translateTexts(cats, "en", lang);
+  await sql.query(
+    `UPDATE products p SET category_${lang} = x.t
+     FROM unnest($1::text[], $2::text[]) AS x(c, t)
+     WHERE p.category = x.c AND p.cat_tr_hash IS NOT NULL AND p.category_${lang} IS NULL`,
+    [cats, cats.map((c) => done.get(c) ?? c)],
+  );
+  return groups.length;
+}
+
+async function translateExtraDescriptions(lang) {
+  const rows = await sql.query(`
+    SELECT p.id, p.description, p.customized FROM products p
+    WHERE p.desc_tr_hash IS NOT NULL AND p.description_${lang} IS NULL
+      AND coalesce(p.description, '') <> ''
+    ORDER BY p.active DESC, (p.stock_qty > 0) DESC, (p.image_url IS NOT NULL) DESC
+    LIMIT ${DESC_BATCH}`);
+  if (rows.length === 0) return 0;
+
+  const texts = [];
+  for (const r of rows) {
+    if (r.customized) {
+      texts.push(r.description);
+      continue;
+    }
+    const segs = segments(r.description);
+    const done = await translateTexts(segs.filter((s) => !isLikelyPolish(s)), "en", lang);
+    // A sentence that failed the guard stays English: readable, nothing lost.
+    texts.push(segs.map((s) => done.get(s) ?? s).join(" "));
+  }
+  await sql.query(
+    `UPDATE products p SET description_${lang} = x.t
+     FROM unnest($1::uuid[], $2::text[]) AS x(id, t) WHERE p.id = x.id`,
+    [rows.map((r) => r.id), texts],
   );
   return rows.length;
 }
@@ -371,14 +451,37 @@ async function translateDescriptions(priorityOnly) {
 
 const totals = { names: 0, categories: 0, descriptions: 0 };
 
+/** German/French work, only for languages LibreTranslate has loaded. */
+async function extraStep(kind) {
+  for (const lang of EXTRA_LANGS) {
+    if (!supported.has(lang)) continue;
+    const n =
+      kind === "names"
+        ? await translateExtraNames(lang)
+        : kind === "categories"
+          ? await translateExtraCategories(lang)
+          : await translateExtraDescriptions(lang);
+    if (n) return n;
+  }
+  return 0;
+}
+
 async function step() {
+  // English and Dutch first: they are what most visitors see.
   let n = await translateDescriptions(true);
   if (n) return (totals.descriptions += n), true;
   n = await translateNames();
   if (n) return (totals.names += n), true;
   n = await translateCategories();
   if (n) return (totals.categories += n), true;
+  // Short German/French texts before the long English/Dutch backlog.
+  n = await extraStep("names");
+  if (n) return (totals.names += n), true;
+  n = await extraStep("categories");
+  if (n) return (totals.categories += n), true;
   n = await translateDescriptions(false);
+  if (n) return (totals.descriptions += n), true;
+  n = await extraStep("descriptions");
   if (n) return (totals.descriptions += n), true;
   return false;
 }

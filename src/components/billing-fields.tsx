@@ -3,7 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/components/i18n-provider";
-import { EU_COUNTRIES } from "@/lib/vat";
+import { countryName, EU_COUNTRIES } from "@/lib/vat";
 
 export type BillingDefaults = {
   addressLine?: string | null;
@@ -19,12 +19,14 @@ export const selectClassName =
 /** EU countries in the visitor’s language, sorted by name. */
 export function CountrySelect({ defaultValue = "NL" }: { defaultValue?: string }) {
   const { locale } = useI18n();
-  const countries = [...EU_COUNTRIES].sort((a, b) => a[locale].localeCompare(b[locale], locale));
+  const countries = EU_COUNTRIES.map((c) => ({ code: c.code, name: countryName(c.code, locale) })).sort(
+    (a, b) => a.name.localeCompare(b.name, locale),
+  );
   return (
     <select id="country" name="country" defaultValue={defaultValue} className={selectClassName}>
       {countries.map((c) => (
         <option key={c.code} value={c.code}>
-          {c[locale]}
+          {c.name}
         </option>
       ))}
     </select>

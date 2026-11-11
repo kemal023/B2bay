@@ -21,6 +21,8 @@ type CartItem = {
     id: string;
     name: string;
     nameNl: string | null;
+    nameDe?: string | null;
+    nameFr?: string | null;
     imageUrl: string | null;
     unit: string;
     priceCents: number;

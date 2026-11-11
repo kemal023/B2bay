@@ -63,7 +63,7 @@ ${details}${button}
 }
 
 const footer = (locale: Locale) =>
-  locale === "en"
+  locale !== "nl"
     ? `${SHOP_NAME} · B2B wholesale. You receive this e-mail because you have a business account with us.`
     : `${SHOP_NAME} · Zakelijke groothandel. Je ontvangt deze e-mail omdat je een zakelijk account bij ons hebt.`;
 
@@ -73,7 +73,7 @@ const footer = (locale: Locale) =>
 
 export function passwordResetEmail(to: string, locale: Locale, link: string): Email {
   return render(
-    locale === "en"
+    locale !== "nl"
       ? {
           subject: `Reset your ${SHOP_NAME} password`,
           heading: "Reset your password",
@@ -100,7 +100,7 @@ export function passwordResetEmail(to: string, locale: Locale, link: string): Em
 
 export function companyApprovedEmail(to: string, locale: Locale, companyName: string): Email {
   return render(
-    locale === "en"
+    locale !== "nl"
       ? {
           subject: `Your business account has been approved`,
           heading: "Welcome — your account is approved",
@@ -130,7 +130,7 @@ export function invoiceIssuedEmail(
 ): Email {
   const url = appUrl(`/invoices/${invoice.orderId}`);
   return render(
-    locale === "en"
+    locale !== "nl"
       ? {
           subject: `Invoice ${invoice.number}`,
           heading: `Invoice ${invoice.number}`,
@@ -171,14 +171,14 @@ export function orderShippedEmail(
   order: { reference: string; orderId: string; carrier?: string | null; trackingUrl?: string | null; trackingCode?: string | null },
 ): Email {
   const details: [string, string][] = [];
-  if (order.carrier) details.push([locale === "en" ? "Carrier" : "Vervoerder", order.carrier]);
-  if (order.trackingCode) details.push([locale === "en" ? "Tracking code" : "Trackingcode", order.trackingCode]);
+  if (order.carrier) details.push([locale !== "nl" ? "Carrier" : "Vervoerder", order.carrier]);
+  if (order.trackingCode) details.push([locale !== "nl" ? "Tracking code" : "Trackingcode", order.trackingCode]);
   const button = order.trackingUrl
-    ? { label: locale === "en" ? "Track your shipment" : "Volg je zending", url: order.trackingUrl }
-    : { label: locale === "en" ? "View order" : "Bestelling bekijken", url: appUrl(`/dashboard/orders/${order.orderId}`) };
+    ? { label: locale !== "nl" ? "Track your shipment" : "Volg je zending", url: order.trackingUrl }
+    : { label: locale !== "nl" ? "View order" : "Bestelling bekijken", url: appUrl(`/dashboard/orders/${order.orderId}`) };
 
   return render(
-    locale === "en"
+    locale !== "nl"
       ? {
           subject: `Your order ${order.reference} has been shipped`,
           heading: "Your order is on its way",

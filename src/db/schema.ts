@@ -236,12 +236,18 @@ export const products = pgTable(
     // catalogue can sort and search on it directly instead of joining the
     // translation cache for every row.
     nameNl: text("name_nl"),
+    // German and French, translated from the English once that is final.
+    // Null = not translated yet; the storefront then shows English.
+    nameDe: text("name_de"),
+    nameFr: text("name_fr"),
     // English description. For a non-English supplier it starts out as the
     // raw source text and is replaced by the translation; the storefront
     // never shows it while it still equals sourceDescription in a foreign
     // language (see lib/product-text.ts).
     description: text("description"),
     descriptionNl: text("description_nl"),
+    descriptionDe: text("description_de"),
+    descriptionFr: text("description_fr"),
     // Raw supplier text, refreshed on every sync — same contract as
     // sourceName: the customer-facing field is only overwritten while it
     // still equals the previous source value.
@@ -249,6 +255,8 @@ export const products = pgTable(
     imageUrl: text("image_url"),
     category: text("category"),
     categoryNl: text("category_nl"),
+    categoryDe: text("category_de"),
+    categoryFr: text("category_fr"),
     sourceCategory: text("source_category"),
     // Detected or configured language of the source_* fields.
     sourceLang: text("source_lang"),

@@ -1,3 +1,5 @@
+import { intlLocale, type Locale } from "@/lib/i18n/config";
+
 export function formatPriceCents(cents: number, currency = "EUR"): string {
   return new Intl.NumberFormat("nl-NL", {
     style: "currency",
@@ -5,8 +7,8 @@ export function formatPriceCents(cents: number, currency = "EUR"): string {
   }).format(cents / 100);
 }
 
-export function formatDate(date: Date | string, locale: "nl" | "en" = "nl"): string {
-  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "nl-NL", {
+export function formatDate(date: Date | string, locale: Locale = "nl"): string {
+  return new Intl.DateTimeFormat(intlLocale(locale), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(date));

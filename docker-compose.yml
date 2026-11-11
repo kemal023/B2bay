@@ -29,7 +29,7 @@ services:
       # models and a much slower first boot. Polish is the source language of
       # most supplier feeds; add a code here when a supplier in another
       # language is connected.
-      - LT_LOAD_ONLY=en,nl,pl
+      - LT_LOAD_ONLY=en,nl,pl,de,fr
       - LT_DISABLE_WEB_UI=true
       - LT_UPDATE_MODELS=false
       # Despite the name this is the number of gunicorn *workers*, each with
@@ -40,7 +40,8 @@ services:
       - LT_THREADS=1
       # Kill a stuck request after 3 minutes instead of the image default 40.
       - LT_TIMEOUT=180
-    mem_limit: 1g
+    # en, nl, pl, de, fr models together use ~0.6–0.9 GB.
+    mem_limit: 1536m
     volumes:
       # Mounted at .local, not deeper: `.local/share` does not exist in the
       # image, so Docker would create it root-owned and the non-root service

@@ -27,7 +27,7 @@ export function termsDoc(locale: Locale, s: CompanyDetails, freeShippingFrom: st
   const name = s.legalName || "CosmeWeb";
   const days = s.paymentTermDays;
 
-  if (locale === "en") {
+  if (locale !== "nl") {
     return {
       title: "General terms and conditions",
       updated: LAST_UPDATED.en,
@@ -197,7 +197,7 @@ export function termsDoc(locale: Locale, s: CompanyDetails, freeShippingFrom: st
 export function privacyDoc(locale: Locale, s: CompanyDetails): LegalDoc {
   const contact = s.email || "info@cosmeweb.nl";
 
-  if (locale === "en") {
+  if (locale !== "nl") {
     return {
       title: "Privacy statement",
       updated: LAST_UPDATED.en,

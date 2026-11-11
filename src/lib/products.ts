@@ -7,8 +7,10 @@ import type { Locale } from "@/lib/i18n/config";
 export const PRODUCTS_PAGE_SIZE = 24;
 
 /** The name the visitor actually sees, so "A → Z" sorts in their language. */
-const displayName = (locale: Locale) =>
-  locale === "nl" ? sql`coalesce(${products.nameNl}, ${products.name})` : sql`${products.name}`;
+const displayName = (locale: Locale) => {
+  const translated = { nl: products.nameNl, de: products.nameDe, fr: products.nameFr, en: null }[locale];
+  return translated ? sql`coalesce(${translated}, ${products.name})` : sql`${products.name}`;
+};
 
 // Labels live in the dictionaries (catalog.sortOptions).
 export const SORT_OPTIONS = {
@@ -44,6 +46,8 @@ function exactWordMatch(word: string): SQL {
   return or(
     ilike(products.name, term),
     ilike(products.nameNl, term),
+    ilike(products.nameDe, term),
+    ilike(products.nameFr, term),
     ilike(products.category, term),
     ilike(products.categoryNl, term),
     ilike(products.ean, term),
@@ -119,8 +123,14 @@ export async function getProduct(id: string) {
   });
 }
 
-/** `category` is the stable key used in URLs; `categoryNl` is its Dutch label. */
-export type CategorySummary = { category: string; categoryNl: string | null; productCount: number };
+/** `category` is the stable key used in URLs; the others are its translated labels. */
+export type CategorySummary = {
+  category: string;
+  categoryNl: string | null;
+  categoryDe: string | null;
+  categoryFr: string | null;
+  productCount: number;
+};
 
 /**
  * Categories with their live product counts.
@@ -134,8 +144,15 @@ export async function listCategorySummaries(
 ): Promise<CategorySummary[]> {
   const db = getDb();
   const { minStockQty } = await getCatalogRules();
-  const rows = await db.execute<{ category: string; category_nl: string | null; n: number }>(sql`
-    SELECT category, MAX(category_nl) AS category_nl, COUNT(*)::int AS n
+  const rows = await db.execute<{
+    category: string;
+    category_nl: string | null;
+    category_de: string | null;
+    category_fr: string | null;
+    n: number;
+  }>(sql`
+    SELECT category, MAX(category_nl) AS category_nl, MAX(category_de) AS category_de,
+           MAX(category_fr) AS category_fr, COUNT(*)::int AS n
     FROM products
     WHERE active = true AND category IS NOT NULL AND stock_qty >= ${minStockQty}
     GROUP BY category
@@ -144,6 +161,8 @@ export async function listCategorySummaries(
   return rows.rows.map((r) => ({
     category: r.category,
     categoryNl: r.category_nl,
+    categoryDe: r.category_de,
+    categoryFr: r.category_fr,
     productCount: Number(r.n),
   }));
 }
@@ -173,6 +192,10 @@ export type ShowcaseProduct = {
   nameNl: string | null;
   category: string | null;
   categoryNl: string | null;
+  nameDe: string | null;
+  nameFr: string | null;
+  categoryDe: string | null;
+  categoryFr: string | null;
   imageUrl: string | null;
   priceCents: number;
   currency: string;
@@ -196,6 +219,10 @@ export async function listTopDeals(limit = 8): Promise<ShowcaseProduct[]> {
     name_nl: string | null;
     category: string | null;
     category_nl: string | null;
+    name_de: string | null;
+    name_fr: string | null;
+    category_de: string | null;
+    category_fr: string | null;
     image_url: string | null;
     price_cents: number;
     currency: string;
@@ -228,7 +255,8 @@ export async function listTopDeals(limit = 8): Promise<ShowcaseProduct[]> {
       SELECT id, 1 AS tier, stock_qty AS score FROM per_category
       WHERE id NOT IN (SELECT id FROM best_sellers)
     )
-    SELECT p.id, p.name, p.name_nl, p.category, p.category_nl, p.image_url, p.price_cents,
+    SELECT p.id, p.name, p.name_nl, p.category, p.category_nl, p.name_de, p.name_fr,
+           p.category_de, p.category_fr, p.image_url, p.price_cents,
            p.currency, p.unit, p.min_order_qty, p.stock_qty
     FROM picked
     JOIN products p ON p.id = picked.id
@@ -242,6 +270,10 @@ export async function listTopDeals(limit = 8): Promise<ShowcaseProduct[]> {
     nameNl: r.name_nl,
     category: r.category,
     categoryNl: r.category_nl,
+    nameDe: r.name_de,
+    nameFr: r.name_fr,
+    categoryDe: r.category_de,
+    categoryFr: r.category_fr,
     imageUrl: r.image_url,
     priceCents: Number(r.price_cents),
     currency: r.currency,

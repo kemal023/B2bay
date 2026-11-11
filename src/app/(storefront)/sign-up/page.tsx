@@ -31,7 +31,7 @@ export default async function SignUpPage() {
         <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
           {t.legal.privacy}
         </Link>
-        .
+        {t.legal.agreeSuffix}.
       </p>
     </AuthShell>
   );

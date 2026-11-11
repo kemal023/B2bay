@@ -1,3 +1,5 @@
+import { de } from "@/lib/i18n/dict-de";
+import { fr } from "@/lib/i18n/dict-fr";
 /**
  * Interface text for the storefront. `en` is typed against `nl`, so a key
  * missing in either language is a type error rather than a blank on screen.
@@ -122,6 +124,7 @@ const nl = {
     lastUpdated: "Laatst bijgewerkt:",
     agreePrefix: "Door een account aan te maken ga je akkoord met onze",
     and: "en",
+    agreeSuffix: "",
   },
   home: {
     badge: "Uitsluitend voor zakelijke afnemers",
@@ -514,6 +517,7 @@ const en: Dictionary = {
     lastUpdated: "Last updated:",
     agreePrefix: "By creating an account you agree to our",
     and: "and",
+    agreeSuffix: "",
   },
   home: {
     badge: "For business customers only",
@@ -785,7 +789,7 @@ const en: Dictionary = {
   },
 };
 
-export const dictionaries = { nl, en };
+export const dictionaries = { nl, en, de, fr };
 
 /** Fills {placeholders}: fmt("Pagina {page}", { page: 2 }). */
 export function fmt(template: string, vars: Record<string, string | number>): string {
