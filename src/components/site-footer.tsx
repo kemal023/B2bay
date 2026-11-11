@@ -2,12 +2,14 @@ import Link from "next/link";
 import { FileText, Mail, ShieldCheck, Truck } from "lucide-react";
 import { SiteLogo } from "@/components/site-logo";
 import { getDictionary } from "@/lib/i18n/server";
+import { getCompanyDetails } from "@/lib/invoicing";
 
 const TRUST_ICONS = [ShieldCheck, Truck, FileText, Mail];
 
 export async function SiteFooter() {
-  const { t } = await getDictionary();
+  const [{ t }, seller] = await Promise.all([getDictionary(), getCompanyDetails()]);
   const f = t.footer;
+  const email = seller.email || "info@cosmeweb.nl";
   return (
     <footer className="mt-auto border-t border-border bg-muted/30">
       <div className="mx-auto grid max-w-7xl gap-6 border-b border-border px-4 py-8 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
@@ -85,20 +87,37 @@ export async function SiteFooter() {
         <div>
           <h3 className="text-sm font-semibold">{f.contact}</h3>
           <ul className="mt-4 space-y-2.5 text-sm text-muted-foreground">
+            {seller.legalName && <li className="text-foreground">{seller.legalName}</li>}
+            {seller.addressLine && (
+              <li>
+                {seller.addressLine}, {seller.postalCode} {seller.city}
+              </li>
+            )}
             <li>
-              <a href="mailto:info@cosmeweb.nl" className="transition-colors hover:text-foreground">
-                info@cosmeweb.nl
+              <a href={`mailto:${email}`} className="transition-colors hover:text-foreground">
+                {email}
               </a>
             </li>
-            <li>{f.kvkOnRequest}</li>
-            <li>{f.vatOnRequest}</li>
+            {seller.phone && (
+              <li>
+                <a href={`tel:${seller.phone.replace(/s+/g, "")}`} className="transition-colors hover:text-foreground">
+                  {seller.phone}
+                </a>
+              </li>
+            )}
+            <li>{seller.kvkNumber ? `KVK ${seller.kvkNumber}` : f.kvkOnRequest}</li>
+            <li>{seller.vatNumber ? `${f.vat} ${seller.vatNumber}` : f.vatOnRequest}</li>
           </ul>
         </div>
       </div>
 
       <div className="border-t border-border">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-5 text-xs text-muted-foreground sm:px-6">
-          <span>© {new Date().getFullYear()} CosmeWeb. {f.rights}</span>
+          <span className="flex flex-wrap gap-x-4 gap-y-1">
+            <span>© {new Date().getFullYear()} {seller.legalName || "CosmeWeb"}. {f.rights}</span>
+            <Link href="/terms" className="hover:text-foreground">{t.legal.terms}</Link>
+            <Link href="/privacy" className="hover:text-foreground">{t.legal.privacy}</Link>
+          </span>
           <span>{f.pricesNote}</span>
         </div>
       </div>

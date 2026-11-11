@@ -54,8 +54,16 @@ const nl = {
     contact: "Contact",
     kvkOnRequest: "KVK: op aanvraag",
     vatOnRequest: "Btw-nummer: op aanvraag",
+    vat: "Btw",
     rights: "Alle rechten voorbehouden.",
     pricesNote: "Alle prijzen zijn exclusief btw en gelden uitsluitend voor zakelijke afnemers.",
+  },
+  legal: {
+    terms: "Algemene voorwaarden",
+    privacy: "Privacyverklaring",
+    lastUpdated: "Laatst bijgewerkt:",
+    agreePrefix: "Door een account aan te maken ga je akkoord met onze",
+    and: "en",
   },
   home: {
     badge: "Uitsluitend voor zakelijke afnemers",
@@ -370,8 +378,16 @@ const en: Dictionary = {
     contact: "Contact",
     kvkOnRequest: "Chamber of Commerce no.: on request",
     vatOnRequest: "VAT number: on request",
+    vat: "VAT",
     rights: "All rights reserved.",
     pricesNote: "All prices exclude VAT and apply to business customers only.",
+  },
+  legal: {
+    terms: "Terms and conditions",
+    privacy: "Privacy statement",
+    lastUpdated: "Last updated:",
+    agreePrefix: "By creating an account you agree to our",
+    and: "and",
   },
   home: {
     badge: "For business customers only",

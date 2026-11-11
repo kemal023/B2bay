@@ -22,6 +22,17 @@ export default async function SignUpPage() {
       }
     >
       <RegisterForm />
+      <p className="mt-4 text-center text-xs leading-relaxed text-muted-foreground">
+        {t.legal.agreePrefix}{" "}
+        <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">
+          {t.legal.terms}
+        </Link>{" "}
+        {t.legal.and}{" "}
+        <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
+          {t.legal.privacy}
+        </Link>
+        .
+      </p>
     </AuthShell>
   );
 }
