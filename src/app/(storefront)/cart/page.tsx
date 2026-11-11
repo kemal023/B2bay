@@ -12,6 +12,9 @@ import { intlLocale } from "@/lib/i18n/config";
 import { fmt, plural } from "@/lib/i18n/dictionaries";
 import { getShippingSettings, qualifiesForFreeShipping } from "@/lib/shipping";
 import { vatTreatmentFor } from "@/lib/vat";
+import { eq } from "drizzle-orm";
+import { getDb } from "@/db";
+import { deliveryAddresses } from "@/db/schema";
 
 export default async function CartPage() {
   const [{ items, subtotalCents }, user, { locale, t }, shipping] = await Promise.all([
@@ -22,6 +25,14 @@ export default async function CartPage() {
   ]);
   const threshold = shipping.freeShippingThresholdCents;
   const freeShipping = qualifiesForFreeShipping(subtotalCents, shipping);
+  const addresses = user?.company
+    ? (
+        await getDb().query.deliveryAddresses.findMany({
+          where: eq(deliveryAddresses.companyId, user.company.id),
+          orderBy: (d, { asc }) => asc(d.label),
+        })
+      ).map((a) => ({ id: a.id, label: `${a.label} — ${a.city}` }))
+    : [];
   const reverseCharge = user?.company ? vatTreatmentFor(user.company) === "reverse_charge" : false;
   const c = t.cart;
 
@@ -154,7 +165,10 @@ export default async function CartPage() {
 
               <div className="mt-5">
                 {companyApproved ? (
-                  <PlaceOrderButton />
+                  <PlaceOrderButton
+                    addresses={addresses}
+                    billingLabel={user?.company?.city ?? null}
+                  />
                 ) : (
                   <Button className="w-full" size="lg" disabled>
                     {c.placeOrder}

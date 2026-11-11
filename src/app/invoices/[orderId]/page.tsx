@@ -11,6 +11,7 @@ import { formatDateOnly, formatPriceCents } from "@/lib/format";
 import { PrintButton } from "@/components/print-button";
 import { SiteLogo } from "@/components/site-logo";
 import { countryName } from "@/lib/vat";
+import type { DeliverySnapshot } from "@/lib/delivery";
 
 type BuyerSnapshot = {
   name: string;
@@ -55,6 +56,8 @@ export default async function InvoicePage({
   // The buyer as it was when invoiced; invoices from before snapshots use the live record.
   const buyer = (order.buyerSnapshot as BuyerSnapshot | null) ?? order.company;
   const reverseCharge = order.vatTreatment === "reverse_charge";
+  // Only printed when it differs from the billing address.
+  const delivery = order.deliveryAddress as DeliverySnapshot | null;
 
   return (
     <div className="min-h-screen bg-muted/40 py-8 print:bg-white print:py-0">
@@ -117,23 +120,41 @@ export default async function InvoicePage({
           {/* Only the buyer here: the seller is the letterhead above and the
               fiscal identifiers sit in the footer, so neither party is
               repeated halfway down the page. */}
-          <section className="py-8">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Factuuradres
-            </h2>
-            <address className="mt-3 text-sm not-italic leading-relaxed">
-              <div className="font-medium">{buyer.name}</div>
-              {buyer.addressLine && <div>{buyer.addressLine}</div>}
-              {(buyer.postalCode || buyer.city) && (
-                <div>
-                  {buyer.postalCode} {buyer.city}
-                </div>
-              )}
-              {buyer.country && <div>{countryName(buyer.country)}</div>}
-              {buyer.billingEmail && <div className="mt-2 text-zinc-600">{buyer.billingEmail}</div>}
-              {buyer.kvkNumber && <div className="text-zinc-600">KVK: {buyer.kvkNumber}</div>}
-              {buyer.vatNumber && <div className="text-zinc-600">Btw-nr.: {buyer.vatNumber}</div>}
-            </address>
+          <section className="grid gap-8 py-8 sm:grid-cols-2">
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                Factuuradres
+              </h2>
+              <address className="mt-3 text-sm not-italic leading-relaxed">
+                <div className="font-medium">{buyer.name}</div>
+                {buyer.addressLine && <div>{buyer.addressLine}</div>}
+                {(buyer.postalCode || buyer.city) && (
+                  <div>
+                    {buyer.postalCode} {buyer.city}
+                  </div>
+                )}
+                {buyer.country && <div>{countryName(buyer.country)}</div>}
+                {buyer.billingEmail && <div className="mt-2 text-zinc-600">{buyer.billingEmail}</div>}
+                {buyer.kvkNumber && <div className="text-zinc-600">KVK: {buyer.kvkNumber}</div>}
+                {buyer.vatNumber && <div className="text-zinc-600">Btw-nr.: {buyer.vatNumber}</div>}
+              </address>
+            </div>
+            {delivery && (
+              <div>
+                <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  Afleveradres
+                </h2>
+                <address className="mt-3 text-sm not-italic leading-relaxed">
+                  <div className="font-medium">{delivery.label}</div>
+                  {delivery.recipient && <div>t.a.v. {delivery.recipient}</div>}
+                  <div>{delivery.addressLine}</div>
+                  <div>
+                    {delivery.postalCode} {delivery.city}
+                  </div>
+                  <div>{countryName(delivery.country)}</div>
+                </address>
+              </div>
+            )}
           </section>
 
           <table className="w-full border-collapse text-sm">

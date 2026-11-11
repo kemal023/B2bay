@@ -102,6 +102,24 @@ export const sessions = pgTable("sessions", {
     .defaultNow(),
 }, (t) => [uniqueIndex("sessions_token_hash_idx").on(t.tokenHash)]);
 
+/** A place a company wants goods delivered — e.g. one per branch. */
+export const deliveryAddresses = pgTable("delivery_addresses", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  companyId: uuid("company_id")
+    .notNull()
+    .references(() => companies.id, { onDelete: "cascade" }),
+  /** Short name the customer recognises, e.g. "Vestiging Rotterdam". */
+  label: text("label").notNull(),
+  /** Recipient / attention line on the parcel. */
+  recipient: text("recipient"),
+  addressLine: text("address_line").notNull(),
+  postalCode: text("postal_code").notNull(),
+  city: text("city").notNull(),
+  country: text("country").notNull().default("NL"),
+  phone: text("phone"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /**
  * A one-time password reset link. Only the SHA-256 of the token is stored,
  * like sessions, so a database leak does not hand out working links.
@@ -317,6 +335,8 @@ export const orders = pgTable("orders", {
   // The seller's name, address and fiscal identifiers exactly as they stood
   // when the invoice was issued. Read live, a later address or bank change
   // would silently rewrite every invoice ever sent.
+  /** Where to deliver, frozen at order time; null = the billing address. */
+  deliveryAddress: jsonb("delivery_address"),
   // Shipment, filled in when the order is marked as shipped.
   carrier: text("carrier"),
   trackingCode: text("tracking_code"),
@@ -352,7 +372,12 @@ export const orderItems = pgTable("order_items", {
   quantity: integer("quantity").notNull(),
 });
 
+export const deliveryAddressesRelations = relations(deliveryAddresses, ({ one }) => ({
+  company: one(companies, { fields: [deliveryAddresses.companyId], references: [companies.id] }),
+}));
+
 export const companiesRelations = relations(companies, ({ many }) => ({
+  deliveryAddresses: many(deliveryAddresses),
   users: many(users),
   cartItems: many(cartItems),
   orders: many(orders),

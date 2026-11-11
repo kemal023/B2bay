@@ -12,6 +12,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Clock, Download, FileText, Truck } from "lucide-react";
 import { carrierName } from "@/lib/shipping-carriers";
+import { deliveryFor } from "@/lib/delivery";
+import { AddressBlock } from "@/components/address-block";
 import { getDictionary } from "@/lib/i18n/server";
 import { fmt, plural } from "@/lib/i18n/dictionaries";
 import { ReorderButton } from "@/components/bulk-cart-actions";
@@ -35,6 +37,7 @@ export default async function OrderDetailPage({
   });
 
   if (!order || order.companyId !== user.company.id) notFound();
+  const delivery = deliveryFor({ deliveryAddress: order.deliveryAddress, company: user.company });
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:py-10">
@@ -117,6 +120,15 @@ export default async function OrderDetailPage({
               <Download className="h-4 w-4" />
             </Link>
           </Button>
+        </div>
+      )}
+
+      {delivery && (
+        <div className="mt-6 rounded-xl border border-border bg-card p-5 shadow-sm">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {t.addresses.deliveryAddress}
+          </p>
+          <AddressBlock address={delivery} locale={locale} />
         </div>
       )}
 

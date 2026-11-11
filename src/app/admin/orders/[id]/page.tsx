@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InvoiceForm, OrderStatusActions, ShipOrderForm } from "@/components/admin/order-actions";
 import { carrierName } from "@/lib/shipping-carriers";
+import { deliveryFor } from "@/lib/delivery";
+import { AddressBlock } from "@/components/address-block";
 import { countryName, isEuCountry, SELLER_COUNTRY, vatTreatmentFor } from "@/lib/vat";
 import { ArrowLeft, Building2, ExternalLink, FileText, Receipt, Truck } from "lucide-react";
 
@@ -26,19 +28,25 @@ const companyStatusLabels: Record<string, string> = {
 };
 
 /** Which VAT the invoice will get, so there are no surprises when it is issued. */
-function vatPreview(c: {
-  country: string;
-  vatNumber: string | null;
-  vatStatus: string;
-  addressLine: string | null;
-}): { text: string; warning: boolean } {
+function vatPreview(
+  c: {
+    country: string;
+    vatNumber: string | null;
+    vatStatus: string;
+    addressLine: string | null;
+  },
+  destination: string | null,
+): { text: string; warning: boolean } {
   if (!c.addressLine) {
     return { text: "Adres van dit bedrijf ontbreekt — vul het eerst in bij Zakelijke accounts.", warning: true };
   }
   if (!isEuCountry(c.country) || c.country === SELLER_COUNTRY) {
     return { text: "Normaal btw-tarief (klant in Nederland).", warning: false };
   }
-  if (vatTreatmentFor(c) === "reverse_charge") {
+  if (destination === SELLER_COUNTRY) {
+    return { text: "Normaal btw-tarief: buitenlandse klant, maar levering in Nederland.", warning: false };
+  }
+  if (vatTreatmentFor(c, destination) === "reverse_charge") {
     return { text: `Btw verlegd (0%) — ${countryName(c.country)}, btw-nummer geldig in VIES.`, warning: false };
   }
   return c.vatNumber
@@ -62,6 +70,7 @@ export default async function AdminOrderDetailPage({
   });
 
   if (!order) notFound();
+  const delivery = deliveryFor(order);
 
   const bySupplier = new Map<
     string,
@@ -237,11 +246,26 @@ export default async function AdminOrderDetailPage({
             </dl>
           </section>
 
+          {delivery && (
+            <section className="rounded-xl border border-border p-5">
+              <h3 className="flex items-center gap-2 text-sm font-semibold">
+                <Truck className="h-4 w-4 text-muted-foreground" />
+                Afleveradres
+                {!order.deliveryAddress && (
+                  <span className="text-xs font-normal text-muted-foreground">(= factuuradres)</span>
+                )}
+              </h3>
+              <div className="mt-3">
+                <AddressBlock address={delivery} />
+              </div>
+            </section>
+          )}
+
           {order.status === "placed" ? (
             <InvoiceForm
               orderId={order.id}
               freeShipping={order.shippingCents === 0}
-              vatPreview={vatPreview(order.company)}
+              vatPreview={vatPreview(order.company, delivery?.country ?? null)}
             />
           ) : (
             <section className="rounded-xl border border-border p-5">

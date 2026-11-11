@@ -13,11 +13,28 @@ export type BillingDefaults = {
   vatNumber?: string | null;
 };
 
+export const selectClassName =
+  "h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30 [&>option]:bg-popover [&>option]:text-popover-foreground";
+
+/** EU countries in the visitor’s language, sorted by name. */
+export function CountrySelect({ defaultValue = "NL" }: { defaultValue?: string }) {
+  const { locale } = useI18n();
+  const countries = [...EU_COUNTRIES].sort((a, b) => a[locale].localeCompare(b[locale], locale));
+  return (
+    <select id="country" name="country" defaultValue={defaultValue} className={selectClassName}>
+      {countries.map((c) => (
+        <option key={c.code} value={c.code}>
+          {c[locale]}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /** Address, country and VAT number — shared by onboarding and the admin company editor. */
 export function BillingFields({ defaults = {} }: { defaults?: BillingDefaults }) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const o = t.onboarding;
-  const countries = [...EU_COUNTRIES].sort((a, b) => a[locale].localeCompare(b[locale], locale));
 
   return (
     <>
@@ -56,18 +73,7 @@ export function BillingFields({ defaults = {} }: { defaults?: BillingDefaults })
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="country">{o.country}</Label>
-          <select
-            id="country"
-            name="country"
-            defaultValue={defaults.country ?? "NL"}
-            className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30 [&>option]:bg-popover [&>option]:text-popover-foreground"
-          >
-            {countries.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c[locale]}
-              </option>
-            ))}
-          </select>
+          <CountrySelect defaultValue={defaults.country ?? "NL"} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="vatNumber">{o.vat}</Label>

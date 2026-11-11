@@ -19,6 +19,7 @@ import {
   Package,
   Receipt,
   ListPlus,
+  MapPin,
 } from "lucide-react";
 import { getDictionary } from "@/lib/i18n/server";
 import { intlLocale } from "@/lib/i18n/config";
@@ -83,6 +84,12 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link href="/dashboard/addresses">
+              <MapPin className="h-4 w-4" />
+              {t.addresses.title}
+            </Link>
+          </Button>
           {approved && (
             <Button asChild variant="outline">
               <Link href="/quick-order">

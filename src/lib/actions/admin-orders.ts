@@ -13,6 +13,7 @@ import {
 } from "@/lib/invoicing";
 import { notifyInvoiceIssued, notifyOrderShipped } from "@/lib/email/notify";
 import { trackingUrlFor } from "@/lib/shipping-carriers";
+import { deliveryFor } from "@/lib/delivery";
 import { recheckCompanyVat } from "@/lib/company-billing";
 import { isEuCountry, SELLER_COUNTRY, VIES_MAX_AGE_MS, vatTreatmentFor } from "@/lib/vat";
 
@@ -94,7 +95,9 @@ export async function invoiceOrder(
       if (check) buyer = { ...buyer, ...check };
     }
 
-    const vatTreatment = vatTreatmentFor(buyer);
+    // The goods must actually leave the Netherlands for reverse charge.
+    const destination = deliveryFor({ deliveryAddress: order.deliveryAddress, company: buyer });
+    const vatTreatment = vatTreatmentFor(buyer, destination?.country);
     const shippingCents = Math.round(shippingEuro * 100);
     const totals = computeInvoiceTotals(
       order.subtotalCents,
@@ -176,7 +179,7 @@ export async function markOrderFulfilled(
     const trackingUrl =
       manualUrl ??
       (carrier && trackingCode
-        ? trackingUrlFor(carrier, trackingCode, order.company)
+        ? trackingUrlFor(carrier, trackingCode, deliveryFor(order) ?? order.company)
         : null);
 
     await db

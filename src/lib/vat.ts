@@ -110,11 +110,20 @@ export type BuyerVatInfo = {
 };
 
 /**
- * Reverse charge only when the buyer is established in another EU country
- * and its VAT number (issued by that same country) is confirmed valid.
+ * Reverse charge only when the buyer is established in another EU country,
+ * its VAT number (issued by that same country) is confirmed valid, and the
+ * goods actually leave the seller's country: a foreign buyer having goods
+ * delivered inside the Netherlands pays Dutch VAT.
+ *
+ * @param destination Delivery country; defaults to the buyer's own country.
  */
-export function vatTreatmentFor(buyer: BuyerVatInfo): VatTreatment {
-  const crossBorder = isEuCountry(buyer.country) && buyer.country !== SELLER_COUNTRY;
+export function vatTreatmentFor(buyer: BuyerVatInfo, destination?: string | null): VatTreatment {
+  const to = destination ?? buyer.country;
+  const crossBorder =
+    isEuCountry(buyer.country) &&
+    buyer.country !== SELLER_COUNTRY &&
+    isEuCountry(to) &&
+    to !== SELLER_COUNTRY;
   const vatMatchesCountry = vatNumberCountry(buyer.vatNumber) === buyer.country;
   return crossBorder && vatMatchesCountry && buyer.vatStatus === "valid" ? "reverse_charge" : "domestic";
 }
