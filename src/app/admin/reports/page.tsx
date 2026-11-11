@@ -4,7 +4,9 @@ import { StatCard } from "@/components/admin/stat-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatPriceCents } from "@/lib/format";
 import { marginBySupplier, revenueByMonth, topCustomers, topProducts, type RankRow } from "@/lib/reports";
-import { ClipboardList, Euro, Percent, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ClipboardList, Download, Euro, Percent, TrendingUp } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +85,33 @@ export default async function AdminReportsPage() {
         title="Cijfers"
         description="Gefactureerde verkopen van de laatste 12 maanden, exclusief btw. Marge = verkoopprijs min inkoopprijs op het moment van bestellen."
       />
+
+      <form
+        action="/admin/reports/export"
+        className="mt-6 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4"
+      >
+        <div className="space-y-1">
+          <label htmlFor="from" className="text-xs font-medium">
+            Van maand
+          </label>
+          <Input id="from" name="from" type="month" defaultValue={months[0]?.month} className="h-9 w-40" />
+        </div>
+        <div className="space-y-1">
+          <label htmlFor="to" className="text-xs font-medium">
+            Tot en met
+          </label>
+          <Input id="to" name="to" type="month" defaultValue={thisMonth?.month} className="h-9 w-40" />
+        </div>
+        <Button type="submit" variant="outline">
+          <Download className="h-4 w-4" />
+          Verkoopboek (CSV) voor de boekhouding
+        </Button>
+        <p className="w-full text-xs text-muted-foreground">
+          Alle facturen en creditnota&apos;s in de periode, met netto, btw, totaal en btw-behandeling (binnenland of
+          verlegd). Te importeren in Moneybird, Exact, e-Boekhouden of Excel. Voor de ICP-opgave: filter op
+          &ldquo;Btw verlegd&rdquo;.
+        </p>
+      </form>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={Euro} label="Omzet 12 maanden" value={formatPriceCents(revenue)} hint="Excl. btw, incl. verzending" />
