@@ -8,3 +8,5 @@ dev.log
 drizzle
 npm-debug.log*
 .DS_Store
+backups
+.claude

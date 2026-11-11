@@ -4,6 +4,8 @@
  *
  *   - supplier sync: asks the app every 10 minutes to sync the suppliers
  *     whose own interval (Admin -> Leveranciers) has passed.
+ *   - watchdog: checks sync errors, backups and the translation service and
+ *     mails the admins when something is wrong (lib/watchdog.ts).
  *
  * Runs one job at a time and waits for it to finish, so syncs never overlap.
  *
@@ -77,6 +79,12 @@ for (;;) {
     await syncSuppliers();
   } catch (err) {
     console.error(`${time()} sync-check mislukt: ${err.message}`);
+  }
+  try {
+    const { problems, mailed } = await getJson(`${APP}/api/cron/watchdog`, 60_000);
+    for (const p of problems) console.log(`${time()} LET OP: ${p.message}${mailed ? " (gemaild)" : ""}`);
+  } catch (err) {
+    console.error(`${time()} controle mislukt: ${err.message}`);
   }
   await sleep(EVERY_MS);
 }

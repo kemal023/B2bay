@@ -9,6 +9,7 @@ import { getCatalogRules, sellableConditions } from "@/lib/rules";
 import { getDictionary } from "@/lib/i18n/server";
 import { fmt } from "@/lib/i18n/dictionaries";
 import { getPricingContext, unitPriceCents } from "@/lib/pricing";
+import { parseQuickOrder } from "@/lib/quick-order";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -221,15 +222,7 @@ export async function quickOrder(text: string): Promise<BulkResult> {
   const { t } = await getDictionary();
   try {
     const user = await requireApprovedCompany();
-    const parsed = text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const m = line.match(/^(\S+?)[\s;,]+(\d+)\s*$/);
-        return m ? { code: m[1], quantity: Number(m[2]) } : { code: line.split(/[\s;,]/)[0], quantity: 1 };
-      })
-      .filter((l) => l.code && l.quantity > 0);
+    const parsed = parseQuickOrder(text);
     if (parsed.length === 0) return { ok: false, error: t.quickOrder.nothing };
     if (parsed.length > 200) return { ok: false, error: t.quickOrder.tooMany };
 
