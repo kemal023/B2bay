@@ -18,6 +18,7 @@ import {
   Euro,
   Package,
   Receipt,
+  ListPlus,
 } from "lucide-react";
 import { getDictionary } from "@/lib/i18n/server";
 import { intlLocale } from "@/lib/i18n/config";
@@ -81,12 +82,22 @@ export default async function DashboardPage() {
             {fmt(d.subtitle, { email: user.email })}
           </p>
         </div>
-        <Button asChild>
-          <Link href="/products">
-            {t.common.continueShopping}
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {approved && (
+            <Button asChild variant="outline">
+              <Link href="/quick-order">
+                <ListPlus className="h-4 w-4" />
+                {t.quickOrder.title}
+              </Link>
+            </Button>
+          )}
+          <Button asChild>
+            <Link href="/products">
+              {t.common.continueShopping}
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {!approved && (

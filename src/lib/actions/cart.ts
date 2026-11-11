@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import { cartItems, products } from "@/db/schema";
+import { cartItems, orders, products } from "@/db/schema";
 import { getAppUserWithCompany } from "@/lib/auth";
 import { getCatalogRules, sellableConditions } from "@/lib/rules";
+import { getDictionary } from "@/lib/i18n/server";
+import { fmt } from "@/lib/i18n/dictionaries";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -125,4 +127,146 @@ export async function getCartWithTotals() {
   );
 
   return { items: rows, subtotalCents };
+}
+
+/**
+ * Adds several products at once (reorder, quick order). Each line is raised
+ * to the product's minimum order quantity and merged with what's already in
+ * the cart. Only products that are sellable right now are added.
+ */
+async function addLinesToCart(
+  companyId: string,
+  lines: { productId: string; quantity: number }[],
+): Promise<{ added: string[]; raised: string[]; unavailable: string[] }> {
+  const db = getDb();
+  const rules = await getCatalogRules();
+  const ids = [...new Set(lines.map((l) => l.productId))];
+  const sellable = ids.length
+    ? await db.query.products.findMany({
+        where: and(inArray(products.id, ids), ...sellableConditions(rules)),
+      })
+    : [];
+  const byId = new Map(sellable.map((p) => [p.id, p]));
+
+  const wanted = new Map<string, number>();
+  for (const l of lines) wanted.set(l.productId, (wanted.get(l.productId) ?? 0) + l.quantity);
+
+  const added: string[] = [];
+  const raised: string[] = [];
+  const unavailable: string[] = [];
+  for (const [productId, quantity] of wanted) {
+    const product = byId.get(productId);
+    if (!product) {
+      unavailable.push(productId);
+      continue;
+    }
+    const qty = Math.max(quantity, product.minOrderQty);
+    if (qty > quantity) raised.push(product.id);
+    await db
+      .insert(cartItems)
+      .values({ companyId, productId, quantity: qty })
+      .onConflictDoUpdate({
+        target: [cartItems.companyId, cartItems.productId],
+        set: { quantity: sql`${cartItems.quantity} + ${qty}`, updatedAt: new Date() },
+      });
+    added.push(product.id);
+  }
+  return { added, raised, unavailable };
+}
+
+export type BulkResult =
+  | { ok: true; message: string; notes: string[] }
+  | { ok: false; error: string };
+
+/** Puts everything from an earlier order back in the cart, at the same quantities. */
+export async function reorder(orderId: string): Promise<BulkResult> {
+  const { t } = await getDictionary();
+  try {
+    const user = await requireApprovedCompany();
+    const db = getDb();
+    const order = await db.query.orders.findFirst({
+      where: and(eq(orders.id, orderId), eq(orders.companyId, user.company!.id)),
+      with: { items: true },
+    });
+    if (!order) return { ok: false, error: t.reorder.none };
+
+    const lines = order.items
+      .filter((i): i is typeof i & { productId: string } => !!i.productId)
+      .map((i) => ({ productId: i.productId, quantity: i.quantity }));
+    const result = await addLinesToCart(user.company!.id, lines);
+    if (result.added.length === 0) return { ok: false, error: t.reorder.none };
+
+    const gone = order.items
+      .filter((i) => !i.productId || result.unavailable.includes(i.productId))
+      .map((i) => i.nameSnapshot);
+    revalidatePath("/cart");
+    return {
+      ok: true,
+      message: fmt(t.reorder.added, { count: result.added.length }),
+      notes: gone.length ? [fmt(t.reorder.skipped, { names: gone.join(", ") })] : [],
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : t.common.error };
+  }
+}
+
+/**
+ * Quick order: one EAN or item number per line, optionally followed by a
+ * quantity ("5901234123457 12", "ABC-123;6", "5901234123457\t3").
+ */
+export async function quickOrder(text: string): Promise<BulkResult> {
+  const { t } = await getDictionary();
+  try {
+    const user = await requireApprovedCompany();
+    const parsed = text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const m = line.match(/^(\S+?)[\s;,]+(\d+)\s*$/);
+        return m ? { code: m[1], quantity: Number(m[2]) } : { code: line.split(/[\s;,]/)[0], quantity: 1 };
+      })
+      .filter((l) => l.code && l.quantity > 0);
+    if (parsed.length === 0) return { ok: false, error: t.quickOrder.nothing };
+    if (parsed.length > 200) return { ok: false, error: t.quickOrder.tooMany };
+
+    const db = getDb();
+    const rules = await getCatalogRules();
+    const codes = [...new Set(parsed.map((l) => l.code))];
+    const found = await db.query.products.findMany({
+      where: and(
+        or(inArray(products.ean, codes), inArray(products.supplierSku, codes)),
+        ...sellableConditions(rules),
+      ),
+    });
+    const byCode = new Map<string, (typeof found)[number]>();
+    for (const p of found) {
+      if (p.ean) byCode.set(p.ean, p);
+      if (p.supplierSku && !byCode.has(p.supplierSku)) byCode.set(p.supplierSku, p);
+    }
+
+    const lines: { productId: string; quantity: number }[] = [];
+    const notFound: string[] = [];
+    for (const l of parsed) {
+      const p = byCode.get(l.code);
+      if (p) lines.push({ productId: p.id, quantity: l.quantity });
+      else notFound.push(l.code);
+    }
+    const result = lines.length
+      ? await addLinesToCart(user.company!.id, lines)
+      : { added: [], raised: [], unavailable: [] };
+
+    const notes: string[] = [];
+    if (notFound.length) notes.push(`${t.quickOrder.notFound} ${[...new Set(notFound)].join(", ")}`);
+    if (result.raised.length) {
+      const codesRaised = found.filter((p) => result.raised.includes(p.id)).map((p) => p.ean ?? p.supplierSku);
+      notes.push(`${t.quickOrder.adjusted} ${codesRaised.join(", ")}`);
+    }
+    if (result.added.length === 0) return { ok: false, error: notes.join(" ") || t.quickOrder.nothing };
+
+    revalidatePath("/cart");
+    return { ok: true, message: fmt(t.quickOrder.added, { count: result.added.length }), notes };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : t.common.error };
+  }
 }

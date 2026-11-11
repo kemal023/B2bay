@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Clock, Download, FileText } from "lucide-react";
 import { getDictionary } from "@/lib/i18n/server";
 import { fmt, plural } from "@/lib/i18n/dictionaries";
+import { ReorderButton } from "@/components/bulk-cart-actions";
 
 export default async function OrderDetailPage({
   params,
@@ -52,9 +53,12 @@ export default async function OrderDetailPage({
             {order.invoiceNumber && fmt(o.invoiceRef, { number: order.invoiceNumber })}
           </p>
         </div>
-        <Badge variant={order.status === "paid" || order.status === "fulfilled" ? "default" : "secondary"}>
-          {(o.statuses as Record<string, string>)[order.status] ?? order.status}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant={order.status === "paid" || order.status === "fulfilled" ? "default" : "secondary"}>
+            {(o.statuses as Record<string, string>)[order.status] ?? order.status}
+          </Badge>
+          {user.company?.status === "approved" && <ReorderButton orderId={order.id} />}
+        </div>
       </div>
 
       {order.status === "placed" && (

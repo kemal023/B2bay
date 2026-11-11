@@ -6,6 +6,7 @@
 
 const nl = {
   common: {
+    error: "Er ging iets mis. Probeer het opnieuw.",
     products: "Producten",
     allProducts: "Alle producten",
     allCategories: "Alle categorieën",
@@ -57,6 +58,25 @@ const nl = {
     vat: "Btw",
     rights: "Alle rechten voorbehouden.",
     pricesNote: "Alle prijzen zijn exclusief btw en gelden uitsluitend voor zakelijke afnemers.",
+  },
+  quickOrder: {
+    title: "Snel bestellen",
+    intro:
+      "Plak of typ per regel een EAN-code of artikelnummer, eventueel gevolgd door het aantal. Bijvoorbeeld: 5901234123457 12",
+    placeholder: "5901234123457 12\n5901234123464; 6\nABC-123 24",
+    submit: "Toevoegen aan winkelmandje",
+    added: "{count} product(en) toegevoegd aan je winkelmandje.",
+    notFound: "Niet gevonden of niet leverbaar:",
+    adjusted: "Aantal verhoogd tot de minimale afname:",
+    nothing: "Er staan geen geldige regels in het veld.",
+    tooMany: "Maximaal 200 regels per keer.",
+    toCart: "Naar winkelmandje",
+  },
+  reorder: {
+    button: "Bestel opnieuw",
+    added: "{count} product(en) opnieuw in je winkelmandje gezet.",
+    skipped: "Niet meer leverbaar: {names}",
+    none: "Geen van deze producten is nog leverbaar.",
   },
   legal: {
     terms: "Algemene voorwaarden",
@@ -330,6 +350,7 @@ export type Dictionary = typeof nl;
 
 const en: Dictionary = {
   common: {
+    error: "Something went wrong. Please try again.",
     products: "Products",
     allProducts: "All products",
     allCategories: "All categories",
@@ -381,6 +402,25 @@ const en: Dictionary = {
     vat: "VAT",
     rights: "All rights reserved.",
     pricesNote: "All prices exclude VAT and apply to business customers only.",
+  },
+  quickOrder: {
+    title: "Quick order",
+    intro:
+      "Paste or type one EAN code or item number per line, optionally followed by the quantity. For example: 5901234123457 12",
+    placeholder: "5901234123457 12\n5901234123464; 6\nABC-123 24",
+    submit: "Add to cart",
+    added: "{count} product(s) added to your cart.",
+    notFound: "Not found or not available:",
+    adjusted: "Quantity raised to the minimum order:",
+    nothing: "There are no valid lines in the field.",
+    tooMany: "At most 200 lines at a time.",
+    toCart: "Go to cart",
+  },
+  reorder: {
+    button: "Order again",
+    added: "{count} product(s) added to your cart again.",
+    skipped: "No longer available: {names}",
+    none: "None of these products is available any more.",
   },
   legal: {
     terms: "Terms and conditions",
