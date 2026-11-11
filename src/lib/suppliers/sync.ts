@@ -10,6 +10,8 @@ export type SyncResult = {
   ok: boolean;
   productsUpserted: number;
   productsDeactivated: number;
+  /** Sync succeeded but something needs a look, e.g. deactivation was skipped. */
+  warning?: string;
   error?: string;
 };
 
@@ -17,6 +19,9 @@ export type SyncResult = {
 // thousands of SKUs (e.g. Annapol's ~70k), so products are upserted in
 // batches of this size via a single multi-row INSERT ... ON CONFLICT.
 const BATCH_SIZE = 250;
+
+/** Never deactivate more than this share of a supplier's range in one sync. */
+const MAX_DEACTIVATE_SHARE = 0.3;
 
 function sellPriceFromCost(costPriceCents: number, markupPercent: number): number {
   return Math.round(costPriceCents * (1 + markupPercent / 100));
@@ -264,7 +269,25 @@ export async function syncSupplier(supplier: SupplierRow): Promise<SyncResult> {
     // feed this time — this scales to huge feeds without needing to pass
     // every current SKU into a giant NOT IN (...) list.
     let deactivated = 0;
-    if (items.length > 0) {
+    let warning: string | undefined;
+    // Active products that were not in this feed, i.e. about to be deactivated.
+    const [{ stale }] = await db
+      .select({ stale: sql<number>`count(*)::int` })
+      .from(products)
+      .where(
+        and(
+          eq(products.supplierId, supplier.id),
+          eq(products.active, true),
+          lt(products.updatedAt, syncStartedAt),
+        ),
+      );
+    // A feed that suddenly misses a large part of the range is far more
+    // likely truncated or broken than a supplier dropping it all at once.
+    // Without this guard an unattended sync could take thousands of
+    // products offline.
+    if (stale > (stale + items.length) * MAX_DEACTIVATE_SHARE) {
+      warning = `Feed bevatte maar ${items.length} producten; ${stale} zouden verdwijnen. Uit voorzorg niets gedeactiveerd.`;
+    } else if (items.length > 0) {
       const result = await db
         .update(products)
         .set({ active: false, updatedAt: new Date() })
@@ -281,7 +304,7 @@ export async function syncSupplier(supplier: SupplierRow): Promise<SyncResult> {
 
     await db
       .update(suppliers)
-      .set({ lastSyncedAt: new Date(), lastSyncError: null })
+      .set({ lastSyncedAt: new Date(), lastSyncError: warning ?? null })
       .where(eq(suppliers.id, supplier.id));
 
     return {
@@ -290,6 +313,7 @@ export async function syncSupplier(supplier: SupplierRow): Promise<SyncResult> {
       ok: true,
       productsUpserted: upserted,
       productsDeactivated: deactivated,
+      warning,
     };
   } catch (err) {
     const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : null;
@@ -319,6 +343,18 @@ export async function syncAllActiveSuppliers(): Promise<SyncResult[]> {
   for (const supplier of active) {
     results.push(await syncSupplier(supplier));
   }
+  return results;
+}
+
+/** Active suppliers whose own sync interval has passed — what the scheduler runs. */
+export async function syncDueSuppliers(): Promise<SyncResult[]> {
+  const db = getDb();
+  const active = await db.query.suppliers.findMany({ where: eq(suppliers.active, true) });
+  const due = active.filter(
+    (s) => !s.lastSyncedAt || Date.now() - s.lastSyncedAt.getTime() >= s.syncIntervalMinutes * 60_000,
+  );
+  const results: SyncResult[] = [];
+  for (const supplier of due) results.push(await syncSupplier(supplier));
   return results;
 }
 

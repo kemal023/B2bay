@@ -77,5 +77,43 @@ services:
     mem_limit: 512m
     restart: unless-stopped
 
+  # Recurring jobs: supplier sync (each supplier on its own interval).
+  #
+  #   volgen  : docker logs -f cosmeweb-scheduler
+  scheduler:
+    image: node:22-alpine
+    container_name: cosmeweb-scheduler
+    working_dir: /app
+    volumes:
+      - ./scripts:/app/scripts:ro
+    env_file:
+      - .env.local
+    environment:
+      - APP_INTERNAL_URL=http://app:3000
+    command: node scripts/scheduler.mjs
+    depends_on:
+      - app
+    mem_limit: 128m
+    restart: unless-stopped
+
+  # Daily pg_dump of the Neon database into ./backups, last 14 days kept.
+  # Neon keeps its own short restore history too; this is the copy that
+  # survives a deleted project or a mistake noticed weeks later.
+  #
+  #   volgen  : docker logs -f cosmeweb-backup
+  backup:
+    image: postgres:18-alpine
+    container_name: cosmeweb-backup
+    volumes:
+      - ./scripts/backup.sh:/backup.sh:ro
+      - ./backups:/backups
+    env_file:
+      - .env.local
+    environment:
+      - KEEP_DAYS=14
+    entrypoint: ["sh", "/backup.sh"]
+    mem_limit: 256m
+    restart: unless-stopped
+
 volumes:
   libretranslate-models:

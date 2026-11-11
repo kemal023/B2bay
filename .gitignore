@@ -43,3 +43,6 @@ next-env.d.ts
 dev.log
 
 .env*
+
+# database backups (scripts/backup.sh)
+/backups/
