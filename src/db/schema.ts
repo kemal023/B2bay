@@ -394,6 +394,8 @@ export const orderItems = pgTable("order_items", {
   }),
   nameSnapshot: text("name_snapshot").notNull(),
   unitPriceCents: integer("unit_price_cents").notNull(),
+  /** What we paid the supplier per unit when the order was placed (for margin reports). */
+  unitCostCents: integer("unit_cost_cents"),
   quantity: integer("quantity").notNull(),
 });
 

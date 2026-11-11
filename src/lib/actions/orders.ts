@@ -86,6 +86,7 @@ export async function placeOrder(deliveryAddressId?: string | null): Promise<Act
       supplierId: i.product.supplierId,
       nameSnapshot: i.product.name,
       unitPriceCents: i.unitPriceCents,
+      unitCostCents: i.product.costPriceCents,
       quantity: i.quantity,
     })),
   );

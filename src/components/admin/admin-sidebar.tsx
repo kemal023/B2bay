@@ -6,6 +6,7 @@ import { useTransition } from "react";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/lib/actions/auth";
 import {
+  BarChart3,
   Boxes,
   Building2,
   ClipboardList,
@@ -44,7 +45,10 @@ export function AdminSidebar({
   const sections: { label: string; items: NavItem[] }[] = [
     {
       label: "Overzicht",
-      items: [{ href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true }],
+      items: [
+        { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+        { href: "/admin/reports", label: "Cijfers", icon: BarChart3 },
+      ],
     },
     {
       label: "Catalogus",
