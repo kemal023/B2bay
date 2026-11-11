@@ -14,6 +14,7 @@ import {
   LogOut,
   Package,
   Settings,
+  ShoppingBasket,
   SlidersHorizontal,
   Store,
 } from "lucide-react";
@@ -62,6 +63,7 @@ export function AdminSidebar({
       label: "Handel",
       items: [
         { href: "/admin/orders", label: "Bestellingen", icon: ClipboardList, badge: openOrders },
+        { href: "/admin/purchasing", label: "Inkooplijst", icon: ShoppingBasket },
         { href: "/admin/companies", label: "Bedrijven", icon: Building2, badge: pendingCompanies },
       ],
     },
