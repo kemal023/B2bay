@@ -6,7 +6,8 @@ import { orders } from "@/db/schema";
 import { formatDate, formatPriceCents } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { InvoiceForm, OrderStatusActions } from "@/components/admin/order-actions";
+import { InvoiceForm, OrderStatusActions, ShipOrderForm } from "@/components/admin/order-actions";
+import { carrierName } from "@/lib/shipping-carriers";
 import { countryName, isEuCountry, SELLER_COUNTRY, vatTreatmentFor } from "@/lib/vat";
 import { ArrowLeft, Building2, ExternalLink, FileText, Receipt, Truck } from "lucide-react";
 
@@ -14,7 +15,7 @@ const statusLabels: Record<string, string> = {
   placed: "Wacht op factuur",
   invoiced: "Factuur verstuurd",
   paid: "Betaald",
-  fulfilled: "Afgerond",
+  fulfilled: "Verzonden",
   cancelled: "Geannuleerd",
 };
 
@@ -275,6 +276,41 @@ export default async function AdminOrderDetailPage({
                     <FileText className="h-4 w-4" />
                     Factuur bekijken
                   </Link>
+                </Button>
+              )}
+            </section>
+          )}
+
+          {(order.status === "invoiced" || order.status === "paid") && (
+            <ShipOrderForm orderId={order.id} />
+          )}
+
+          {order.status === "fulfilled" && (
+            <section className="rounded-xl border border-border p-5">
+              <h3 className="flex items-center gap-2 text-sm font-semibold">
+                <Truck className="h-4 w-4 text-muted-foreground" />
+                Verzonden
+              </h3>
+              <dl className="mt-3 space-y-2 text-sm">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Datum</dt>
+                  <dd className="text-right">{order.shippedAt ? formatDate(order.shippedAt) : "—"}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Vervoerder</dt>
+                  <dd className="text-right">{carrierName(order.carrier) ?? "—"}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Trackingcode</dt>
+                  <dd className="text-right font-mono text-xs">{order.trackingCode ?? "—"}</dd>
+                </div>
+              </dl>
+              {order.trackingUrl && (
+                <Button asChild variant="outline" className="mt-4 w-full">
+                  <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-4 w-4" />
+                    Zending volgen
+                  </a>
                 </Button>
               )}
             </section>

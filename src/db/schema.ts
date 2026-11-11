@@ -317,6 +317,11 @@ export const orders = pgTable("orders", {
   // The seller's name, address and fiscal identifiers exactly as they stood
   // when the invoice was issued. Read live, a later address or bank change
   // would silently rewrite every invoice ever sent.
+  // Shipment, filled in when the order is marked as shipped.
+  carrier: text("carrier"),
+  trackingCode: text("tracking_code"),
+  trackingUrl: text("tracking_url"),
+  shippedAt: timestamp("shipped_at", { withTimezone: true }),
   /** domestic | reverse_charge — fixed when the invoice is issued. */
   vatTreatment: text("vat_treatment"),
   /** Buyer name/address/VAT number as on the invoice, frozen like the seller. */

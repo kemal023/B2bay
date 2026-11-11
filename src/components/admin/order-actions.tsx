@@ -12,7 +12,8 @@ import {
   markOrderFulfilled,
   markOrderPaid,
 } from "@/lib/actions/admin-orders";
-import { Ban, CheckCircle2, FileText, Loader2, Send } from "lucide-react";
+import { Ban, CheckCircle2, FileText, Loader2, Send, Truck } from "lucide-react";
+import { CARRIERS } from "@/lib/shipping-carriers";
 
 export function InvoiceForm({
   orderId,
@@ -101,16 +102,65 @@ export function OrderStatusActions({ orderId, status }: { orderId: string; statu
           <CheckCircle2 className="h-4 w-4" /> Markeer als betaald
         </Button>
       )}
-      {status === "paid" && (
-        <Button size="sm" onClick={() => run(markOrderFulfilled)} disabled={isPending}>
-          <CheckCircle2 className="h-4 w-4" /> Markeer als afgerond
-        </Button>
-      )}
       {status !== "cancelled" && status !== "fulfilled" && (
         <Button size="sm" variant="outline" onClick={() => run(cancelOrder)} disabled={isPending}>
           <Ban className="h-4 w-4" /> Annuleren
         </Button>
       )}
     </div>
+  );
+}
+
+/** Marks the order as shipped; carrier and tracking code end up in the customer's mail. */
+export function ShipOrderForm({ orderId }: { orderId: string }) {
+  const [isPending, startTransition] = useTransition();
+
+  function handleSubmit(formData: FormData) {
+    startTransition(async () => {
+      const result = await markOrderFulfilled(orderId, formData);
+      if (result.ok) toast.success("Gemarkeerd als verzonden");
+      else toast.error(result.error);
+    });
+  }
+
+  return (
+    <section className="rounded-xl border border-border p-5">
+      <h3 className="flex items-center gap-2 text-sm font-semibold">
+        <Truck className="h-4 w-4 text-muted-foreground" />
+        Verzenden
+      </h3>
+      <p className="mt-1 text-xs text-muted-foreground">
+        De klant krijgt een mail met de trackinglink. Trackingcode is optioneel.
+      </p>
+      <form action={handleSubmit} className="mt-4 space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="carrier">Vervoerder</Label>
+          <select
+            id="carrier"
+            name="carrier"
+            defaultValue="postnl"
+            className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30 [&>option]:bg-popover [&>option]:text-popover-foreground"
+          >
+            {CARRIERS.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="trackingCode">Trackingcode</Label>
+          <Input id="trackingCode" name="trackingCode" placeholder="3SABCD1234567" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="trackingUrl">Trackinglink (alleen bij &quot;Anders&quot;)</Label>
+          <Input id="trackingUrl" name="trackingUrl" type="url" placeholder="https://…" />
+        </div>
+        <Button type="submit" disabled={isPending} className="w-full">
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Truck className="h-4 w-4" />}
+          Markeer als verzonden
+        </Button>
+      </form>
+    </section>
   );
 }

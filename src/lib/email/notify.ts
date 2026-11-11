@@ -1,12 +1,13 @@
 import "server-only";
 import { after } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { companies, orders, users } from "@/db/schema";
 import { formatDate, formatDateOnly, formatPriceCents } from "@/lib/format";
 import { getCompanyDetails, invoiceDueDate } from "@/lib/invoicing";
 import { isLocale, type Locale } from "@/lib/i18n/config";
 import { sendEmail, type Email } from "@/lib/email/send";
+import { carrierName } from "@/lib/shipping-carriers";
 import {
   adminNewCompanyEmail,
   adminNewOrderEmail,
@@ -116,7 +117,7 @@ export function notifyOrderShipped(orderId: string) {
   later(async () => {
     const db = getDb();
     const order = await db.query.orders.findFirst({
-      where: and(eq(orders.id, orderId)),
+      where: eq(orders.id, orderId),
       with: { placedBy: true },
     });
     if (!order?.placedBy) return null;
@@ -124,6 +125,9 @@ export function notifyOrderShipped(orderId: string) {
     return orderShippedEmail(order.placedBy.email, locale, {
       orderId: order.id,
       reference: order.invoiceNumber ?? formatDate(order.createdAt, locale),
+      carrier: carrierName(order.carrier),
+      trackingCode: order.trackingCode,
+      trackingUrl: order.trackingUrl,
     });
   });
 }

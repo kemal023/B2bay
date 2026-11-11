@@ -9,7 +9,7 @@ const statusLabels: Record<string, string> = {
   placed: "Wacht op factuur",
   invoiced: "Factuur verstuurd",
   paid: "Betaald",
-  fulfilled: "Afgerond",
+  fulfilled: "Verzonden",
   cancelled: "Geannuleerd",
 };
 

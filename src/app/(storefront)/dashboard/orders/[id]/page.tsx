@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, Download, FileText } from "lucide-react";
+import { ArrowLeft, Clock, Download, FileText, Truck } from "lucide-react";
+import { carrierName } from "@/lib/shipping-carriers";
 import { getDictionary } from "@/lib/i18n/server";
 import { fmt, plural } from "@/lib/i18n/dictionaries";
 import { ReorderButton } from "@/components/bulk-cart-actions";
@@ -69,6 +70,34 @@ export default async function OrderDetailPage({
             {order.shippingCents === 0 ? o.awaitingFreeBody : o.awaitingBody}
           </AlertDescription>
         </Alert>
+      )}
+
+      {order.status === "fulfilled" && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5">
+          <div className="flex min-w-0 items-start gap-3">
+            <Truck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+            <div className="min-w-0">
+              <p className="font-medium">{o.shippedTitle}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {order.shippedAt && fmt(o.shippedOn, { date: formatDate(order.shippedAt, locale) })}
+                {order.carrier && ` ${fmt(o.via, { carrier: carrierName(order.carrier) ?? "" })}`}
+                {order.trackingCode && (
+                  <>
+                    {" · "}
+                    {o.trackingCode}: <span className="font-mono">{order.trackingCode}</span>
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+          {order.trackingUrl && (
+            <Button asChild>
+              <a href={order.trackingUrl} target="_blank" rel="noopener noreferrer">
+                {o.track}
+              </a>
+            </Button>
+          )}
+        </div>
       )}
 
       {order.invoiceNumber && (

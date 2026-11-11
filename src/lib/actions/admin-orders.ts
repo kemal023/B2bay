@@ -12,6 +12,7 @@ import {
   nextInvoiceNumber,
 } from "@/lib/invoicing";
 import { notifyInvoiceIssued, notifyOrderShipped } from "@/lib/email/notify";
+import { trackingUrlFor } from "@/lib/shipping-carriers";
 import { recheckCompanyVat } from "@/lib/company-billing";
 import { isEuCountry, SELLER_COUNTRY, VIES_MAX_AGE_MS, vatTreatmentFor } from "@/lib/vat";
 
@@ -151,11 +152,37 @@ export async function markOrderPaid(orderId: string): Promise<ActionResult> {
   }
 }
 
-export async function markOrderFulfilled(orderId: string): Promise<ActionResult> {
+/** Marks the order as shipped, optionally with carrier and tracking code. */
+export async function markOrderFulfilled(
+  orderId: string,
+  formData?: FormData,
+): Promise<ActionResult> {
   try {
     await requireAdmin();
     const db = getDb();
-    await db.update(orders).set({ status: "fulfilled" }).where(eq(orders.id, orderId));
+    const carrier = String(formData?.get("carrier") ?? "").trim() || null;
+    const trackingCode = String(formData?.get("trackingCode") ?? "").trim() || null;
+    const manualUrl = String(formData?.get("trackingUrl") ?? "").trim() || null;
+    if (manualUrl && !/^https?:\/\//i.test(manualUrl)) {
+      return { ok: false, error: "De trackinglink moet met http:// of https:// beginnen." };
+    }
+
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+      with: { company: true },
+    });
+    if (!order) return { ok: false, error: "Bestelling niet gevonden." };
+
+    const trackingUrl =
+      manualUrl ??
+      (carrier && trackingCode
+        ? trackingUrlFor(carrier, trackingCode, order.company)
+        : null);
+
+    await db
+      .update(orders)
+      .set({ status: "fulfilled", carrier, trackingCode, trackingUrl, shippedAt: new Date() })
+      .where(eq(orders.id, orderId));
     notifyOrderShipped(orderId);
     revalidateOrder(orderId);
     return { ok: true };
