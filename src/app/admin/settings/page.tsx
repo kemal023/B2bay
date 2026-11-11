@@ -5,10 +5,16 @@ import { getCompanyDetails, missingCompanyFields } from "@/lib/invoicing";
 import { getShippingSettings } from "@/lib/shipping";
 import { EmailSettings } from "@/components/admin/email-settings";
 import { emailConfigured } from "@/lib/email/send";
+import { VolumeTiersForm } from "@/components/admin/volume-tiers-form";
+import { getVolumeTiers } from "@/lib/pricing";
 import { TriangleAlert } from "lucide-react";
 
 export default async function AdminSettingsPage() {
-  const [details, shipping] = await Promise.all([getCompanyDetails(), getShippingSettings()]);
+  const [details, shipping, tiers] = await Promise.all([
+    getCompanyDetails(),
+    getShippingSettings(),
+    getVolumeTiers(),
+  ]);
   const missing = missingCompanyFields(details);
 
   return (
@@ -37,6 +43,10 @@ export default async function AdminSettingsPage() {
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <ShippingSettingsForm shipping={shipping} />
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <VolumeTiersForm tiers={tiers} />
       </section>
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">

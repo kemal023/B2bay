@@ -67,6 +67,11 @@ export default async function AdminCompaniesPage() {
                   <div className="text-xs text-muted-foreground">
                     {c.addressLine ? `${c.addressLine}, ${c.postalCode} ${c.city}` : "Geen adres"}
                     {c.kvkNumber && ` · KVK ${c.kvkNumber}`}
+                    {c.discountPercent > 0 && (
+                      <span className="ml-1 font-medium text-emerald-600 dark:text-emerald-400">
+                        · {c.discountPercent}% korting
+                      </span>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-sm">{countryName(c.country)}</TableCell>

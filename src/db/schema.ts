@@ -61,6 +61,8 @@ export const companies = pgTable("companies", {
   vatCheckedAt: timestamp("vat_checked_at", { withTimezone: true }),
   /** Company name as registered in VIES, to compare with what they typed. */
   vatRegisteredName: text("vat_registered_name"),
+  /** Price agreement: percentage off every list price for this company. */
+  discountPercent: integer("discount_percent").notNull().default(0),
   status: companyStatusEnum("status").notNull().default("pending"),
   joinCode: text("join_code").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })

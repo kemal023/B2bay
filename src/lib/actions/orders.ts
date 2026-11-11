@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import { cartItems, deliveryAddresses, orderItems, orders } from "@/db/schema";
 import { getDictionary } from "@/lib/i18n/server";
 import type { DeliverySnapshot } from "@/lib/delivery";
+import { getPricingContext, unitPriceCents } from "@/lib/pricing";
 import { getAppUserWithCompany } from "@/lib/auth";
 import { getShippingSettings, qualifiesForFreeShipping } from "@/lib/shipping";
 import { notifyNewOrder } from "@/lib/email/notify";
@@ -57,10 +58,10 @@ export async function placeOrder(deliveryAddressId?: string | null): Promise<Act
     };
   }
 
-  const subtotalCents = items.reduce(
-    (sum, i) => sum + i.product.priceCents * i.quantity,
-    0,
-  );
+  // The customer’s own price (agreement + volume tier), frozen per line.
+  const pricing = await getPricingContext(user.company);
+  const priced = items.map((i) => ({ ...i, unitPriceCents: unitPriceCents(i.product.priceCents, i.quantity, pricing) }));
+  const subtotalCents = priced.reduce((sum, i) => sum + i.unitPriceCents * i.quantity, 0);
 
   const freeShipping = qualifiesForFreeShipping(subtotalCents, await getShippingSettings());
 
@@ -79,12 +80,12 @@ export async function placeOrder(deliveryAddressId?: string | null): Promise<Act
     .returning();
 
   await db.insert(orderItems).values(
-    items.map((i) => ({
+    priced.map((i) => ({
       orderId: order.id,
       productId: i.product.id,
       supplierId: i.product.supplierId,
       nameSnapshot: i.product.name,
-      unitPriceCents: i.product.priceCents,
+      unitPriceCents: i.unitPriceCents,
       quantity: i.quantity,
     })),
   );

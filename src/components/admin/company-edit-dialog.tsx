@@ -29,6 +29,7 @@ type Company = {
   city: string | null;
   country: string;
   vatNumber: string | null;
+  discountPercent: number;
 };
 
 export function CompanyEditDialog({ company }: { company: Company }) {
@@ -81,6 +82,22 @@ export function CompanyEditDialog({ company }: { company: Company }) {
               </div>
             </div>
             <BillingFields defaults={company} />
+            <div className="space-y-2 border-t border-border pt-4">
+              <Label htmlFor="discountPercent">Prijsafspraak: korting op alle producten (%)</Label>
+              <Input
+                id="discountPercent"
+                name="discountPercent"
+                type="number"
+                min={0}
+                max={90}
+                step={1}
+                defaultValue={company.discountPercent}
+                className="max-w-32"
+              />
+              <p className="text-xs text-muted-foreground">
+                Komt bovenop eventuele staffelkorting. 0 = catalogusprijs.
+              </p>
+            </div>
             <Button type="submit" className="w-full" disabled={isPending}>
               {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Opslaan

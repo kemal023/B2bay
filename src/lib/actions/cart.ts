@@ -8,6 +8,7 @@ import { getAppUserWithCompany } from "@/lib/auth";
 import { getCatalogRules, sellableConditions } from "@/lib/rules";
 import { getDictionary } from "@/lib/i18n/server";
 import { fmt } from "@/lib/i18n/dictionaries";
+import { getPricingContext, unitPriceCents } from "@/lib/pricing";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -121,12 +122,14 @@ export async function getCartWithTotals() {
     orderBy: (t, { desc }) => desc(t.updatedAt),
   });
 
-  const subtotalCents = rows.reduce(
-    (sum, row) => sum + row.product.priceCents * row.quantity,
-    0,
-  );
+  const pricing = await getPricingContext(user.company);
+  const items = rows.map((row) => ({
+    ...row,
+    unitPriceCents: unitPriceCents(row.product.priceCents, row.quantity, pricing),
+  }));
+  const subtotalCents = items.reduce((sum, row) => sum + row.unitPriceCents * row.quantity, 0);
 
-  return { items: rows, subtotalCents };
+  return { items, subtotalCents };
 }
 
 /**

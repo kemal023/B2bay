@@ -24,15 +24,19 @@ export function ProductCard({
   product,
   priceAccess,
   locale,
+  discountPercent = 0,
 }: {
   product: ProductCardProduct;
   priceAccess: PriceAccess;
   locale: Locale;
+  /** The customer’s price agreement; volume tiers show on the product page. */
+  discountPercent?: number;
 }) {
   const t = dictionaries[locale];
   const showPrice = priceAccess === "visible";
   const name = localizedName(product, locale);
   const category = localizedCategory(product, locale);
+  const price = Math.round(product.priceCents * (1 - discountPercent / 100));
 
   return (
     <Link
@@ -76,8 +80,15 @@ export function ProductCard({
         <div className="mt-auto flex items-end justify-between gap-2 pt-3">
           {showPrice ? (
             <div>
-              <div className="text-lg font-semibold tracking-tight text-foreground">
-                {formatPriceCents(product.priceCents, product.currency)}
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-semibold tracking-tight text-foreground">
+                  {formatPriceCents(price, product.currency)}
+                </span>
+                {price < product.priceCents && (
+                  <span className="text-xs text-muted-foreground line-through">
+                    {formatPriceCents(product.priceCents, product.currency)}
+                  </span>
+                )}
               </div>
               <div className="text-[11px] text-muted-foreground">
                 {fmt(t.common.perUnit, { unit: localizedUnit(product.unit, locale) })}

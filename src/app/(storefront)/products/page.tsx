@@ -49,6 +49,8 @@ export default async function ProductsPage({
     ? (categories.find((cat) => cat.category === category)?.label ?? category)
     : null;
   const priceAccess = priceAccessFor(user);
+  // Staff see list prices; a customer sees its own price agreement.
+  const discount = user?.role === "platform_admin" ? 0 : (user?.company?.discountPercent ?? 0);
   const showPrice = priceAccess === "visible";
 
   // Sorting by price would reveal the price order to visitors who aren't
@@ -248,7 +250,7 @@ export default async function ProductsPage({
             <>
               <div className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                 {products.map((p) => (
-                  <ProductCard key={p.id} product={p} priceAccess={priceAccess} locale={locale} />
+                  <ProductCard key={p.id} product={p} priceAccess={priceAccess} locale={locale} discountPercent={discount} />
                 ))}
               </div>
 

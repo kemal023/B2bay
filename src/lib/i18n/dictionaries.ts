@@ -98,6 +98,14 @@ const nl = {
     notFound: "Dit afleveradres bestaat niet (meer).",
     deliveryAddress: "Afleveradres",
   },
+  pricing: {
+    youSave: "{percent}% korting",
+    yourPrice: "Jouw prijs",
+    listPrice: "Catalogusprijs",
+    volumeTitle: "Staffelkorting",
+    volumeFrom: "Vanaf {qty} {unit}",
+    perUnit: "per {unit}",
+  },
   legal: {
     terms: "Algemene voorwaarden",
     privacy: "Privacyverklaring",
@@ -466,6 +474,14 @@ const en: Dictionary = {
     labelRequired: "Please give the address a name.",
     notFound: "This delivery address does not exist (any more).",
     deliveryAddress: "Delivery address",
+  },
+  pricing: {
+    youSave: "{percent}% off",
+    yourPrice: "Your price",
+    listPrice: "List price",
+    volumeTitle: "Volume discount",
+    volumeFrom: "From {qty} {unit}",
+    perUnit: "per {unit}",
   },
   legal: {
     terms: "Terms and conditions",

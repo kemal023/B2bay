@@ -37,6 +37,8 @@ export default async function HomePage() {
     getDictionary(),
   ]);
   const priceAccess = priceAccessFor(user);
+  // Staff see list prices; a customer sees its own price agreement.
+  const discount = user?.role === "platform_admin" ? 0 : (user?.company?.discountPercent ?? 0);
   const h = t.home;
   const formatCount = (n: number) => n.toLocaleString(intlLocale(locale));
 
@@ -153,7 +155,7 @@ export default async function HomePage() {
 
           <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {topDeals.map((p) => (
-              <ProductCard key={p.id} product={p} priceAccess={priceAccess} locale={locale} />
+              <ProductCard key={p.id} product={p} priceAccess={priceAccess} locale={locale} discountPercent={discount} />
             ))}
           </div>
         </section>

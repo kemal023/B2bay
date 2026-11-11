@@ -9,6 +9,7 @@ import { getAppUserWithCompany } from "@/lib/auth";
 import { priceAccessFor } from "@/lib/price-visibility";
 import { formatPriceCents } from "@/lib/format";
 import { getDictionary } from "@/lib/i18n/server";
+import { getVolumeTiers, unitPriceCents } from "@/lib/pricing";
 import { intlLocale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/dictionaries";
 import {
@@ -35,6 +36,10 @@ export default async function ProductDetailPage({
   if (!product) notFound();
 
   const priceAccess = priceAccessFor(user);
+  // Staff see list prices; a customer sees its own price agreement.
+  const discount = user?.role === "platform_admin" ? 0 : (user?.company?.discountPercent ?? 0);
+  const pricing = { companyDiscountPercent: discount, tiers: priceAccess === "visible" ? await getVolumeTiers() : [] };
+  const yourPrice = unitPriceCents(product.priceCents, 1, pricing);
   const showPrice = priceAccess === "visible";
   const p = t.product;
   const num = (n: number) => n.toLocaleString(intlLocale(locale));
@@ -148,15 +153,38 @@ export default async function ProductDetailPage({
           <div className="mt-6 rounded-xl border border-border bg-card p-5 shadow-sm">
             {showPrice ? (
               <>
-                <div className="flex items-end gap-2">
+                <div className="flex flex-wrap items-end gap-2">
                   <span className="text-3xl font-semibold tracking-tight">
-                    {formatPriceCents(product.priceCents, product.currency)}
+                    {formatPriceCents(yourPrice, product.currency)}
                   </span>
                   <span className="pb-1 text-sm text-muted-foreground">/ {unit}</span>
+                  {yourPrice < product.priceCents && (
+                    <span className="pb-1 text-sm text-muted-foreground line-through">
+                      {formatPriceCents(product.priceCents, product.currency)}
+                    </span>
+                  )}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {fmt(p.exclVatMin, { qty: product.minOrderQty, unit })}
                 </p>
+                {pricing.tiers.length > 0 && (
+                  <div className="mt-4 rounded-lg bg-muted/50 p-3">
+                    <p className="text-xs font-semibold">{t.pricing.volumeTitle}</p>
+                    <ul className="mt-1.5 space-y-1 text-xs">
+                      {pricing.tiers.map((tier) => (
+                        <li key={tier.minQty} className="flex justify-between gap-3">
+                          <span className="text-muted-foreground">
+                            {fmt(t.pricing.volumeFrom, { qty: tier.minQty, unit })}
+                          </span>
+                          <span className="tabular-nums">
+                            {formatPriceCents(unitPriceCents(product.priceCents, tier.minQty, pricing), product.currency)}{" "}
+                            <span className="text-emerald-600 dark:text-emerald-400">−{tier.percent}%</span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </>
             ) : (
               <div className="rounded-lg bg-brand-soft p-4">
@@ -235,7 +263,7 @@ export default async function ProductDetailPage({
           </div>
           <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {related.map((r) => (
-              <ProductCard key={r.id} product={r} priceAccess={priceAccess} locale={locale} />
+              <ProductCard key={r.id} product={r} priceAccess={priceAccess} locale={locale} discountPercent={discount} />
             ))}
           </div>
         </section>

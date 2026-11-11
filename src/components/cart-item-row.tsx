@@ -15,6 +15,8 @@ import { localizedName, localizedUnit } from "@/lib/product-text";
 type CartItem = {
   id: string;
   quantity: number;
+  /** This customer’s price per unit at this quantity (agreement + volume tier). */
+  unitPriceCents: number;
   product: {
     id: string;
     name: string;
@@ -77,11 +79,21 @@ export function CartItemRow({ item }: { item: CartItem }) {
           </Link>
           <p className="mt-1 text-xs text-muted-foreground">
             {fmt(t.cart.unitLine, {
-              price: formatPriceCents(item.product.priceCents, item.product.currency),
+              price: formatPriceCents(item.unitPriceCents, item.product.currency),
               unit,
               qty: item.product.minOrderQty,
             })}
           </p>
+          {item.unitPriceCents < item.product.priceCents && (
+            <p className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">
+              {fmt(t.pricing.youSave, {
+                percent: Math.round((1 - item.unitPriceCents / item.product.priceCents) * 100),
+              })}{" "}
+              <span className="text-muted-foreground line-through">
+                {formatPriceCents(item.product.priceCents, item.product.currency)}
+              </span>
+            </p>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -109,7 +121,7 @@ export function CartItemRow({ item }: { item: CartItem }) {
 
       <div className="shrink-0 text-right">
         <div className="font-semibold tabular-nums">
-          {formatPriceCents(item.product.priceCents * item.quantity, item.product.currency)}
+          {formatPriceCents(item.unitPriceCents * item.quantity, item.product.currency)}
         </div>
         <div className="mt-0.5 text-xs text-muted-foreground">{t.cart.exclVat}</div>
       </div>

@@ -43,6 +43,11 @@ export async function updateCompanyBilling(id: string, formData: FormData): Prom
     const current = await db.query.companies.findFirst({ where: eq(companies.id, id) });
     if (!current) return { ok: false, error: "Bedrijf niet gevonden." };
 
+    const discountPercent = Number(formData.get("discountPercent") ?? 0);
+    if (!Number.isInteger(discountPercent) || discountPercent < 0 || discountPercent > 90) {
+      return { ok: false, error: "Korting moet een heel getal tussen 0 en 90 zijn." };
+    }
+
     const vatChanged = billing.value.vatNumber !== current.vatNumber;
     const vat = vatChanged ? await verifyVat(billing.value.vatNumber) : {};
 
@@ -52,6 +57,7 @@ export async function updateCompanyBilling(id: string, formData: FormData): Prom
         name,
         kvkNumber: String(formData.get("kvkNumber") ?? "").trim() || null,
         billingEmail: String(formData.get("billingEmail") ?? "").trim() || null,
+        discountPercent,
         ...billing.value,
         ...vat,
       })
