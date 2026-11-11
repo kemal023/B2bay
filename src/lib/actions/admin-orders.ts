@@ -11,6 +11,7 @@ import {
   missingCompanyFields,
   nextInvoiceNumber,
 } from "@/lib/invoicing";
+import { notifyInvoiceIssued, notifyOrderShipped } from "@/lib/email/notify";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -84,6 +85,7 @@ export async function invoiceOrder(
       })
       .where(eq(orders.id, orderId));
 
+    notifyInvoiceIssued(orderId);
     revalidateOrder(orderId);
     return { ok: true };
   } catch (err) {
@@ -111,6 +113,7 @@ export async function markOrderFulfilled(orderId: string): Promise<ActionResult>
     await requireAdmin();
     const db = getDb();
     await db.update(orders).set({ status: "fulfilled" }).where(eq(orders.id, orderId));
+    notifyOrderShipped(orderId);
     revalidateOrder(orderId);
     return { ok: true };
   } catch (err) {

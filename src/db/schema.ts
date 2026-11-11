@@ -69,6 +69,8 @@ export const users = pgTable(
     }),
     name: text("name"),
     role: userRoleEnum("role").notNull().default("buyer"),
+    /** Language for e-mails; follows the storefront language switcher. */
+    locale: text("locale").notNull().default("nl"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -88,6 +90,25 @@ export const sessions = pgTable("sessions", {
     .notNull()
     .defaultNow(),
 }, (t) => [uniqueIndex("sessions_token_hash_idx").on(t.tokenHash)]);
+
+/**
+ * A one-time password reset link. Only the SHA-256 of the token is stored,
+ * like sessions, so a database leak does not hand out working links.
+ */
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("password_reset_tokens_hash_idx").on(t.tokenHash)],
+);
 
 /**
  * A pluggable upstream product source (e.g. Maxy, Annapol). New suppliers
@@ -358,6 +379,10 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
   company: one(companies, {
     fields: [orders.companyId],
     references: [companies.id],
+  }),
+  placedBy: one(users, {
+    fields: [orders.placedByUserId],
+    references: [users.id],
   }),
   items: many(orderItems),
 }));

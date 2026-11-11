@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import { cartItems, orderItems, orders } from "@/db/schema";
 import { getAppUserWithCompany } from "@/lib/auth";
 import { getShippingSettings, qualifiesForFreeShipping } from "@/lib/shipping";
+import { notifyNewOrder } from "@/lib/email/notify";
 
 export type ActionResult = { ok: true; orderId: string } | { ok: false; error: string };
 
@@ -64,6 +65,7 @@ export async function placeOrder(): Promise<ActionResult> {
   );
 
   await db.delete(cartItems).where(eq(cartItems.companyId, user.company.id));
+  notifyNewOrder(order.id);
 
   redirect(`/dashboard/orders/${order.id}`);
 }

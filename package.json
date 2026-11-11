@@ -20,6 +20,7 @@
     "lucide-react": "^1.49.0",
     "next": "16.3.7",
     "next-themes": "^0.4.6",
+    "nodemailer": "^7.0.13",
     "radix-ui": "^1.6.7",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -32,6 +33,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/sax": "^1.2.7",

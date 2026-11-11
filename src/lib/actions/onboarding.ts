@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { companies, users } from "@/db/schema";
 import { generateJoinCode, getAppUser } from "@/lib/auth";
+import { notifyNewCompany } from "@/lib/email/notify";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -40,6 +41,7 @@ export async function createCompany(formData: FormData): Promise<ActionResult> {
     .set({ companyId: company.id, role: "company_admin" })
     .where(eq(users.id, appUser.id));
 
+  notifyNewCompany(company.id, appUser.email);
   redirect("/dashboard");
 }
 

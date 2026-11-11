@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { isPlatformAdmin } from "@/lib/auth";
+import { getAppUser, isPlatformAdmin } from "@/lib/auth";
+import { emailConfigured, sendEmail } from "@/lib/email/send";
 import { saveCompanyDetails, type CompanyDetails } from "@/lib/invoicing";
 import { saveShippingSettings } from "@/lib/shipping";
 
@@ -73,6 +74,27 @@ export async function updateShippingSettings(
       ok: true,
       message: enabled ? "Gratis verzending opgeslagen." : "Gratis verzending uitgeschakeld.",
     };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Onbekende fout." };
+  }
+}
+
+export async function sendTestEmail(): Promise<SettingsActionResult> {
+  try {
+    const user = await getAppUser();
+    if (user?.role !== "platform_admin") throw new Error("Geen toegang.");
+    if (!emailConfigured()) {
+      return { ok: false, error: "SMTP is nog niet ingesteld (SMTP_HOST en MAIL_FROM in .env.local)." };
+    }
+    const sent = await sendEmail({
+      to: user.email,
+      subject: "Testmail van je webshop",
+      text: "Deze testmail laat zien dat het versturen van e-mails werkt.",
+      html: "<p>Deze testmail laat zien dat het versturen van e-mails werkt.</p>",
+    });
+    return sent
+      ? { ok: true, message: `Testmail verstuurd naar ${user.email}.` }
+      : { ok: false, error: "Versturen mislukt. Bekijk de app-logs voor de foutmelding van de mailserver." };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Onbekende fout." };
   }

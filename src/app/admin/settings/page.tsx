@@ -3,6 +3,8 @@ import { CompanyDetailsForm } from "@/components/admin/company-details-form";
 import { ShippingSettingsForm } from "@/components/admin/shipping-settings-form";
 import { getCompanyDetails, missingCompanyFields } from "@/lib/invoicing";
 import { getShippingSettings } from "@/lib/shipping";
+import { EmailSettings } from "@/components/admin/email-settings";
+import { emailConfigured } from "@/lib/email/send";
 import { TriangleAlert } from "lucide-react";
 
 export default async function AdminSettingsPage() {
@@ -35,6 +37,10 @@ export default async function AdminSettingsPage() {
 
       <section className="mt-6 rounded-xl border border-border bg-card p-6">
         <ShippingSettingsForm shipping={shipping} />
+      </section>
+
+      <section className="mt-6 rounded-xl border border-border bg-card p-6">
+        <EmailSettings configured={emailConfigured()} from={process.env.MAIL_FROM ?? null} />
       </section>
     </div>
   );

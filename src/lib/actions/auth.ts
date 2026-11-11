@@ -1,6 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+import { eq } from "drizzle-orm";
+import { getDictionary, getLocale } from "@/lib/i18n/server";
+import { isLocale } from "@/lib/i18n/config";
+import { consumeResetToken, createResetToken } from "@/lib/auth/password-reset";
+import { appUrl, sendEmail } from "@/lib/email/send";
+import { passwordResetEmail } from "@/lib/email/templates";
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
@@ -30,6 +37,7 @@ export async function registerAction(formData: FormData): Promise<ActionResult> 
       email,
       passwordHash: await hashPassword(password),
       name: name || null,
+      locale: await getLocale(),
     })
     .returning();
 
@@ -53,4 +61,40 @@ export async function loginAction(formData: FormData): Promise<ActionResult> {
 export async function logoutAction(): Promise<void> {
   await destroySession();
   redirect("/");
+}
+
+export type ResetRequestResult = { ok: true; sent: boolean } | { ok: false; error: string };
+
+/**
+ * Always answers the same whether or not the address has an account, so the
+ * form can't be used to find out who is a customer.
+ */
+export async function requestPasswordReset(formData: FormData): Promise<ResetRequestResult> {
+  const { t, locale } = await getDictionary();
+  const email = normalizeEmail(String(formData.get("email") ?? ""));
+  if (!email || !email.includes("@")) return { ok: false, error: t.auth.invalidEmail };
+
+  const user = await findUserByEmail(email);
+  if (user) {
+    const token = await createResetToken(user.id);
+    if (token) {
+      const link = appUrl(`/reset-password?token=${encodeURIComponent(token)}`);
+      after(() => sendEmail(passwordResetEmail(user.email, isLocale(user.locale) ? user.locale : locale, link)));
+    }
+  }
+  return { ok: true, sent: true };
+}
+
+export async function resetPasswordAction(formData: FormData): Promise<ActionResult> {
+  const { t } = await getDictionary();
+  const token = String(formData.get("token") ?? "");
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8) return { ok: false, error: t.auth.passwordTooShort };
+
+  const userId = await consumeResetToken(token, await hashPassword(password));
+  if (!userId) return { ok: false, error: t.auth.resetInvalid };
+
+  const user = await getDb().query.users.findFirst({ where: eq(users.id, userId) });
+  await createSession(userId);
+  redirect(user?.companyId ? "/dashboard" : "/onboarding");
 }
