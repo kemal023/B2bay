@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { getLocale } from "@/lib/i18n/server";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -22,10 +23,11 @@ export const metadata: Metadata = {
 // Deliberately minimal: the storefront look (header/footer) lives in
 // (storefront)/layout.tsx and the admin panel has its own distinct shell
 // in admin/layout.tsx — they should never look like the same site.
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const locale = await getLocale();
   return (
     <html
-      lang="nl"
+      lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-background text-foreground">

@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { cartItems, products } from "@/db/schema";
 import { getAppUserWithCompany } from "@/lib/auth";
+import { getCatalogRules, sellableConditions } from "@/lib/rules";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -15,18 +16,37 @@ async function requireCompany() {
   return user;
 }
 
+/**
+ * Adding to the cart needs an approved company, not just any company: the
+ * cart shows line prices, so a pending account could otherwise read the
+ * wholesale prices it is not allowed to see by putting items in a basket.
+ */
+async function requireApprovedCompany() {
+  const user = await requireCompany();
+  if (user.company!.status !== "approved") {
+    throw new Error("Je bedrijfsaccount is nog niet goedgekeurd.");
+  }
+  return user;
+}
+
 export async function addToCart(
   productId: string,
   quantity: number,
 ): Promise<ActionResult> {
   try {
-    const user = await requireCompany();
+    const user = await requireApprovedCompany();
     const db = getDb();
 
+    const rules = await getCatalogRules();
     const product = await db.query.products.findFirst({
-      where: and(eq(products.id, productId), eq(products.active, true)),
+      where: and(eq(products.id, productId), ...sellableConditions(rules)),
     });
-    if (!product) return { ok: false, error: "Product niet gevonden." };
+    if (!product) {
+      return {
+        ok: false,
+        error: "Dit product is op dit moment niet te bestellen.",
+      };
+    }
 
     const qty = Math.max(quantity, product.minOrderQty);
 

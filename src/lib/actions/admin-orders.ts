@@ -5,6 +5,12 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orders } from "@/db/schema";
 import { isPlatformAdmin } from "@/lib/auth";
+import {
+  computeInvoiceTotals,
+  getCompanyDetails,
+  missingCompanyFields,
+  nextInvoiceNumber,
+} from "@/lib/invoicing";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -19,7 +25,12 @@ function revalidateOrder(id: string) {
   revalidatePath("/dashboard");
 }
 
-/** Sets the shipping cost and marks the order as invoiced. */
+/**
+ * Issues the invoice: fixes the shipping cost, applies VAT at the rate
+ * configured at this moment, and assigns the next number in the yearly
+ * sequence. The rate and amounts are frozen onto the order, so later changes
+ * to the settings never rewrite an invoice that has already been sent.
+ */
 export async function invoiceOrder(
   orderId: string,
   formData: FormData,
@@ -29,7 +40,6 @@ export async function invoiceOrder(
     const db = getDb();
 
     const shippingEuro = Number(formData.get("shippingEuro") ?? 0);
-    const invoiceNumber = String(formData.get("invoiceNumber") ?? "").trim();
     const invoiceNotes = String(formData.get("invoiceNotes") ?? "").trim();
 
     if (!Number.isFinite(shippingEuro) || shippingEuro < 0) {
@@ -38,16 +48,37 @@ export async function invoiceOrder(
 
     const order = await db.query.orders.findFirst({ where: eq(orders.id, orderId) });
     if (!order) return { ok: false, error: "Bestelling niet gevonden." };
+    if (order.invoiceNumber) {
+      return { ok: false, error: "Deze bestelling heeft al een factuur." };
+    }
+
+    const details = await getCompanyDetails();
+    const missing = missingCompanyFields(details);
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        error: `Vul eerst je bedrijfsgegevens aan bij Instellingen: ${missing.join(", ")}.`,
+      };
+    }
 
     const shippingCents = Math.round(shippingEuro * 100);
+    const totals = computeInvoiceTotals(
+      order.subtotalCents,
+      shippingCents,
+      details.vatRatePercent,
+    );
+    const invoiceNumber = await nextInvoiceNumber();
 
     await db
       .update(orders)
       .set({
         shippingCents,
-        totalCents: order.subtotalCents + shippingCents,
+        vatCents: totals.vatCents,
+        vatRatePercent: totals.vatRatePercent,
+        sellerSnapshot: details,
+        totalCents: totals.totalCents,
         status: "invoiced",
-        invoiceNumber: invoiceNumber || null,
+        invoiceNumber,
         invoiceNotes: invoiceNotes || null,
         invoicedAt: new Date(),
       })

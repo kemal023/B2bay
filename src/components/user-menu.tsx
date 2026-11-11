@@ -12,9 +12,11 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { logoutAction } from "@/lib/actions/auth";
 import { LogOut } from "lucide-react";
+import { useI18n } from "@/components/i18n-provider";
 
 export function UserMenu({ email, name }: { email: string; name: string | null }) {
   const [, startTransition] = useTransition();
+  const { t } = useI18n();
   const initials = (name || email).slice(0, 2).toUpperCase();
 
   return (
@@ -31,7 +33,7 @@ export function UserMenu({ email, name }: { email: string; name: string | null }
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => startTransition(() => logoutAction())}>
           <LogOut className="h-4 w-4" />
-          Uitloggen
+          {t.common.signOut}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

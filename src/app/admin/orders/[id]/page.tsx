@@ -1,13 +1,13 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orders } from "@/db/schema";
 import { formatDate, formatPriceCents } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { InvoiceForm, OrderStatusActions } from "@/components/admin/order-actions";
-import { ExternalLink, Truck } from "lucide-react";
+import { ArrowLeft, Building2, ExternalLink, FileText, Receipt, Truck } from "lucide-react";
 
 const statusLabels: Record<string, string> = {
   placed: "Wacht op factuur",
@@ -15,6 +15,12 @@ const statusLabels: Record<string, string> = {
   paid: "Betaald",
   fulfilled: "Afgerond",
   cancelled: "Geannuleerd",
+};
+
+const companyStatusLabels: Record<string, string> = {
+  approved: "Goedgekeurd",
+  pending: "In beoordeling",
+  suspended: "Opgeschort",
 };
 
 export default async function AdminOrderDetailPage({
@@ -49,112 +55,206 @@ export default async function AdminOrderDetailPage({
     bySupplier.set(key, entry);
   }
 
-  return (
-    <div className="max-w-3xl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">{order.company.name}</h2>
-          <p className="text-sm text-muted-foreground">{formatDate(order.createdAt)}</p>
-        </div>
-        <Badge variant={order.status === "paid" || order.status === "fulfilled" ? "default" : "secondary"}>
-          {statusLabels[order.status] ?? order.status}
-        </Badge>
-      </div>
+  const itemCount = order.items.reduce((sum, i) => sum + i.quantity, 0);
 
-      <div className="mt-4">
+  return (
+    <div>
+      <Button asChild variant="ghost" size="sm" className="-ml-2 mb-4">
+        <Link href="/admin/orders">
+          <ArrowLeft className="h-4 w-4" />
+          Terug naar bestellingen
+        </Link>
+      </Button>
+
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5">
+        <div>
+          <div className="flex flex-wrap items-center gap-3">
+            <h2 className="text-xl font-semibold tracking-tight">{order.company.name}</h2>
+            <Badge
+              variant={
+                order.status === "paid" || order.status === "fulfilled" ? "default" : "secondary"
+              }
+            >
+              {statusLabels[order.status] ?? order.status}
+            </Badge>
+          </div>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            {formatDate(order.createdAt)} · {order.items.length} regel
+            {order.items.length === 1 ? "" : "s"} · {itemCount.toLocaleString("nl-NL")} artikel
+            {itemCount === 1 ? "" : "en"}
+          </p>
+        </div>
         <OrderStatusActions orderId={order.id} status={order.status} />
       </div>
 
-      <div className="mt-6 grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Producten</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {order.items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between text-sm">
-                <span>
-                  {item.nameSnapshot} <span className="text-muted-foreground">× {item.quantity}</span>
-                </span>
-                <span className="font-medium">
-                  {formatPriceCents(item.unitPriceCents * item.quantity, order.currency)}
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
+        <div className="min-w-0 space-y-6">
+          <section className="overflow-hidden rounded-xl border border-border">
+            <header className="flex items-center gap-2 border-b border-border bg-muted/40 px-5 py-3">
+              <Receipt className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold">Producten</h3>
+            </header>
+            <div className="divide-y divide-border">
+              {order.items.map((item) => (
+                <div key={item.id} className="flex items-start justify-between gap-4 px-5 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{item.nameSnapshot}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {formatPriceCents(item.unitPriceCents, order.currency)} × {item.quantity}
+                      {item.supplier?.name && ` · ${item.supplier.name}`}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-medium tabular-nums">
+                    {formatPriceCents(item.unitPriceCents * item.quantity, order.currency)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-2 border-t border-border bg-muted/20 px-5 py-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotaal</span>
+                <span className="tabular-nums">
+                  {formatPriceCents(order.subtotalCents, order.currency)}
                 </span>
               </div>
-            ))}
-            <Separator className="my-2" />
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Subtotaal</span>
-              <span>{formatPriceCents(order.subtotalCents, order.currency)}</span>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Verzendkosten</span>
+                <span className="tabular-nums">
+                  {order.shippingCents != null
+                    ? formatPriceCents(order.shippingCents, order.currency)
+                    : "Nog te bepalen"}
+                </span>
+              </div>
+              {order.vatCents != null && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Btw {order.vatRatePercent}%
+                  </span>
+                  <span className="tabular-nums">
+                    {formatPriceCents(order.vatCents, order.currency)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-border pt-2 text-base font-semibold">
+                <span>Totaal{order.vatCents != null ? " incl. btw" : ""}</span>
+                <span className="tabular-nums">
+                  {formatPriceCents(order.totalCents, order.currency)}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Verzendkosten</span>
-              <span>
-                {order.shippingCents != null
-                  ? formatPriceCents(order.shippingCents, order.currency)
-                  : "Nog te bepalen"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between font-semibold">
-              <span>Totaal</span>
-              <span>{formatPriceCents(order.totalCents, order.currency)}</span>
-            </div>
-          </CardContent>
-        </Card>
+          </section>
 
-        {order.status === "placed" ? (
-          <InvoiceForm orderId={order.id} />
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Factuur</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1 text-sm">
-              <p><span className="text-muted-foreground">Nummer:</span> {order.invoiceNumber || "—"}</p>
-              {order.invoiceNotes && <p className="text-muted-foreground">{order.invoiceNotes}</p>}
-              <p><span className="text-muted-foreground">Verstuurd:</span> {order.invoicedAt ? formatDate(order.invoicedAt) : "—"}</p>
-              <p><span className="text-muted-foreground">Betaald:</span> {order.paidAt ? formatDate(order.paidAt) : "—"}</p>
-            </CardContent>
-          </Card>
-        )}
+          <section className="overflow-hidden rounded-xl border border-border">
+            <header className="border-b border-border bg-muted/40 px-5 py-3">
+              <h3 className="flex items-center gap-2 text-sm font-semibold">
+                <Truck className="h-4 w-4 text-muted-foreground" />
+                Inkoop bij leveranciers
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Alleen zichtbaar voor beheerders — de klant ziet dit nergens. Gebruik
+                dit om te bepalen waar je deze bestelling moet inkopen.
+              </p>
+            </header>
+            <div className="divide-y divide-border">
+              {[...bySupplier.values()].map((group) => (
+                <div key={group.name} className="px-5 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium">{group.name}</span>
+                    {group.baseUrl && (
+                      <a
+                        href={group.baseUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        Naar leverancier
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                  <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                    {group.items.map((item) => (
+                      <li key={item.id} className="flex justify-between gap-4">
+                        <span className="min-w-0">{item.nameSnapshot}</span>
+                        <span className="shrink-0 tabular-nums">× {item.quantity}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <aside className="space-y-6">
+          <section className="rounded-xl border border-border p-5">
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              Klant
+            </h3>
+            <dl className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">Bedrijf</dt>
+                <dd className="text-right font-medium">{order.company.name}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">KVK</dt>
+                <dd className="text-right">{order.company.kvkNumber || "—"}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">Btw-nummer</dt>
+                <dd className="text-right">{order.company.vatNumber || "—"}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">Status</dt>
+                <dd className="text-right">
+                  {companyStatusLabels[order.company.status] ?? order.company.status}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          {order.status === "placed" ? (
+            <InvoiceForm orderId={order.id} freeShipping={order.shippingCents === 0} />
+          ) : (
+            <section className="rounded-xl border border-border p-5">
+              <h3 className="flex items-center gap-2 text-sm font-semibold">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Factuur
+              </h3>
+              <dl className="mt-3 space-y-2 text-sm">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Nummer</dt>
+                  <dd className="text-right font-medium">{order.invoiceNumber || "—"}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Aangemaakt</dt>
+                  <dd className="text-right">
+                    {order.invoicedAt ? formatDate(order.invoicedAt) : "—"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-muted-foreground">Betaald</dt>
+                  <dd className="text-right">{order.paidAt ? formatDate(order.paidAt) : "—"}</dd>
+                </div>
+              </dl>
+              {order.invoiceNotes && (
+                <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+                  {order.invoiceNotes}
+                </p>
+              )}
+              {order.invoiceNumber && (
+                <Button asChild variant="outline" className="mt-4 w-full">
+                  <Link href={`/invoices/${order.id}`}>
+                    <FileText className="h-4 w-4" />
+                    Factuur bekijken
+                  </Link>
+                </Button>
+              )}
+            </section>
+          )}
+        </aside>
       </div>
-
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Truck className="h-4 w-4" /> Inkoop bij leveranciers
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Alleen zichtbaar voor beheerders — de klant ziet dit nergens.
-            Gebruik dit om te bepalen waar je deze bestelling moet inkopen.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {[...bySupplier.values()].map((group) => (
-            <div key={group.name} className="rounded-lg border border-border p-3">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{group.name}</span>
-                {group.baseUrl && (
-                  <a
-                    href={group.baseUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    Naar leverancier <ExternalLink className="h-3 w-3" />
-                  </a>
-                )}
-              </div>
-              <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                {group.items.map((item) => (
-                  <li key={item.id}>
-                    {item.nameSnapshot} × {item.quantity}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
     </div>
   );
 }

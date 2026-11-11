@@ -11,4 +11,71 @@ services:
       - .env.local
     environment:
       - NODE_ENV=production
+      # Reachable over the compose network; never exposed to the internet.
+      - TRANSLATE_URL=http://libretranslate:5000
+    depends_on:
+      - libretranslate
     restart: unless-stopped
+
+  # Self-hosted translation. The catalogue is ~51M characters, which no free
+  # hosted API allows, so this runs locally with no per-character cost.
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    container_name: cosmeweb-translate
+    ports:
+      - "5050:5000"
+    environment:
+      # Only the languages we need — loading every language costs GBs of
+      # models and a much slower first boot. Polish is the source language of
+      # most supplier feeds; add a code here when a supplier in another
+      # language is connected.
+      - LT_LOAD_ONLY=en,nl,pl
+      - LT_DISABLE_WEB_UI=true
+      - LT_UPDATE_MODELS=false
+      # Despite the name this is the number of gunicorn *workers*, each with
+      # its own copy of the model. The batch job sends one request at a time,
+      # so a second worker only costs memory — and the image recycles workers
+      # every 250 requests (--max-requests), which with two of them could
+      # push the container past its limit mid-swap and leave it hung.
+      - LT_THREADS=1
+      # Kill a stuck request after 3 minutes instead of the image default 40.
+      - LT_TIMEOUT=180
+    mem_limit: 1g
+    volumes:
+      # Mounted at .local, not deeper: `.local/share` does not exist in the
+      # image, so Docker would create it root-owned and the non-root service
+      # user could not write its models there.
+      - libretranslate-models:/home/libretranslate/.local
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://localhost:5000/languages')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      # Model download on first boot takes a few minutes.
+      start_period: 10m
+      retries: 5
+    restart: unless-stopped
+
+  # Keeps every product's name, category and description translated into
+  # English and Dutch, for every supplier — including ones added later. It
+  # never finishes: once caught up it waits for new or changed products.
+  # Resumable at any point, so a restart (or an OOM kill) costs nothing.
+  #
+  #   volgen  : docker logs -f cosmeweb-translator
+  translator:
+    image: node:22-alpine
+    container_name: cosmeweb-translator
+    working_dir: /app
+    volumes:
+      - .:/app
+    env_file:
+      - .env.local
+    environment:
+      - TRANSLATE_URL=http://libretranslate:5000
+    command: node scripts/translate-catalog.mjs
+    depends_on:
+      - libretranslate
+    mem_limit: 512m
+    restart: unless-stopped
+
+volumes:
+  libretranslate-models:

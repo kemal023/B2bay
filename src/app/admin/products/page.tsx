@@ -2,15 +2,15 @@ import Link from "next/link";
 import { and, eq, gt, ilike, or, sql, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { products } from "@/db/schema";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProductForm } from "@/components/admin/product-form";
 import { ProductRowActions } from "@/components/admin/product-row-actions";
+import { AdminPageHeader, AdminTableShell } from "@/components/admin/page-header";
+import { getCatalogRules } from "@/lib/rules";
 import { formatPriceCents } from "@/lib/format";
-import { ChevronLeft, ChevronRight, Package, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImageOff, Package, Plus, Search } from "lucide-react";
 
 const PAGE_SIZE = 50;
 
@@ -27,10 +27,13 @@ export default async function AdminProductsPage({
 
   const conditions = [];
   if (q) {
-    const term = `%${q}%`;
-    conditions.push(
-      or(ilike(products.name, term), ilike(products.category, term), ilike(products.ean, term))!,
-    );
+    const words = q.trim().split(/\s+/).filter(Boolean);
+    for (const word of words) {
+      const term = `%${word}%`;
+      conditions.push(
+        or(ilike(products.name, term), ilike(products.category, term), ilike(products.ean, term))!,
+      );
+    }
   }
   if (supplierFilter === "manual") {
     conditions.push(isNull(products.supplierId));
@@ -42,19 +45,26 @@ export default async function AdminProductsPage({
   }
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-  const [allProducts, totalRow, allSuppliers] = await Promise.all([
+  const [allProducts, totalRow, allSuppliers, rules] = await Promise.all([
     db.query.products.findMany({
       where,
-      orderBy: (t, { desc }) => desc(t.updatedAt),
+      // Live products first — otherwise a bulk edit of delisted rows pushes
+      // them to the top and buries the catalogue the admin actually manages.
+      orderBy: (t, { desc }) => [desc(t.active), desc(t.updatedAt)],
       with: { supplier: { columns: { name: true } } },
       limit: PAGE_SIZE,
       offset: (page - 1) * PAGE_SIZE,
     }),
     db.select({ count: sql<number>`count(*)::int` }).from(products).where(where),
     db.query.suppliers.findMany({ columns: { id: true, name: true }, orderBy: (t, { asc }) => asc(t.name) }),
+    getCatalogRules(),
   ]);
 
   const total = totalRow[0]?.count ?? 0;
+  // Admins see every product, but a row the catalogue rules currently exclude
+  // from sale is flagged — otherwise "Zichtbaar" would be a lie.
+  const blockedByRule = (p: { active: boolean; stockQty: number }) =>
+    p.active && rules.minStockQty > 0 && p.stockQty < rules.minStockQty;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   function pageHref(target: number) {
@@ -69,27 +79,34 @@ export default async function AdminProductsPage({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold">Producten &amp; prijzen</h2>
-          <p className="text-sm text-muted-foreground">
-            {total.toLocaleString("nl-NL")} product{total === 1 ? "" : "en"} — van
-            leveranciers gesynchroniseerd of handmatig toegevoegd. Verkoopprijzen
-            zijn hier altijd aanpasbaar.
-          </p>
-        </div>
-        <ProductForm
-          trigger={
-            <Button>
-              <Plus className="h-4 w-4" />
-              Product toevoegen
-            </Button>
-          }
-        />
-      </div>
+      <AdminPageHeader
+        title="Producten & prijzen"
+        description={`${total.toLocaleString("nl-NL")} product${total === 1 ? "" : "en"} — van leveranciers gesynchroniseerd of handmatig toegevoegd. Verkoopprijzen zijn hier altijd aanpasbaar.`}
+        action={
+          <ProductForm
+            trigger={
+              <Button>
+                <Plus className="h-4 w-4" />
+                Product toevoegen
+              </Button>
+            }
+          />
+        }
+      />
 
-      <form className="mt-6 flex flex-wrap items-center gap-2" action="/admin/products">
-        <Input name="q" placeholder="Zoek op naam, categorie of EAN..." defaultValue={q} className="w-64" />
+      <form
+        className="mt-6 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-3"
+        action="/admin/products"
+      >
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            name="q"
+            placeholder="Zoek op naam, categorie of EAN..."
+            defaultValue={q}
+            className="w-64 pl-9"
+          />
+        </div>
         <select
           name="supplier"
           defaultValue={supplierFilter ?? ""}
@@ -117,20 +134,29 @@ export default async function AdminProductsPage({
             <Link href="/admin/products">Wissen</Link>
           </Button>
         )}
+        <span className="ml-auto pr-1 text-xs text-muted-foreground">
+          {total.toLocaleString("nl-NL")} resultaten
+        </span>
       </form>
 
       {allProducts.length === 0 ? (
-        <Card className="mt-8">
-          <CardContent className="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground">
-            <Package className="h-10 w-10" />
-            <p>Geen producten gevonden. Pas je filter aan, of voeg er hierboven één toe.</p>
-          </CardContent>
-        </Card>
+        <div className="mt-8 flex flex-col items-center gap-4 rounded-xl border border-dashed border-border py-16 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <Package className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-medium">Geen producten gevonden</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Pas je filter aan, of voeg er hierboven één toe.
+            </p>
+          </div>
+        </div>
       ) : (
         <>
-          <Table className="mt-6">
+          <AdminTableShell>
+          <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead>Product</TableHead>
                 <TableHead>Bron</TableHead>
                 <TableHead className="text-right">Kostprijs</TableHead>
@@ -151,30 +177,63 @@ export default async function AdminProductsPage({
                 return (
                   <TableRow key={p.id}>
                     <TableCell>
-                      <div className="w-[220px]">
-                        <div className="truncate font-medium" title={p.name}>{p.name}</div>
-                        <div className="truncate text-xs text-muted-foreground">
-                          {[p.category, p.ean].filter(Boolean).join(" · ")}
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-white">
+                          {p.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- supplier image domains are dynamic and admin-managed
+                            <img
+                              src={p.imageUrl}
+                              alt=""
+                              loading="lazy"
+                              className="h-full w-full object-contain p-0.5"
+                            />
+                          ) : (
+                            <ImageOff className="h-3.5 w-3.5 text-zinc-300" />
+                          )}
+                        </div>
+                        <div className="w-[184px]">
+                          <div className="truncate font-medium" title={p.name}>{p.name}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {[p.category, p.ean].filter(Boolean).join(" · ")}
+                          </div>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {p.supplier?.name ?? "Handmatig"}
                     </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
+                    <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
                       {p.costPriceCents != null ? formatPriceCents(p.costPriceCents, p.currency) : "—"}
                     </TableCell>
-                    <TableCell className="text-right font-medium">
+                    <TableCell className="text-right font-medium tabular-nums">
                       {formatPriceCents(p.priceCents, p.currency)}
                     </TableCell>
-                    <TableCell className="text-right text-sm text-muted-foreground">
+                    <TableCell className="text-right text-sm tabular-nums text-muted-foreground">
                       {margin != null ? `${margin}%` : "—"}
                     </TableCell>
-                    <TableCell className="text-right">{p.stockQty}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {p.stockQty.toLocaleString("nl-NL")}
+                    </TableCell>
                     <TableCell>
-                      <Badge variant={p.active ? "default" : "secondary"}>
-                        {p.active ? "Zichtbaar" : "Verborgen"}
-                      </Badge>
+                      <span
+                        className="flex items-center gap-1.5 text-xs"
+                        title={
+                          blockedByRule(p)
+                            ? `Voldoet niet aan de voorraadregel (minimaal ${rules.minStockQty})`
+                            : undefined
+                        }
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                            !p.active
+                              ? "bg-muted-foreground"
+                              : blockedByRule(p)
+                                ? "bg-amber-500"
+                                : "bg-emerald-500"
+                          }`}
+                        />
+                        {!p.active ? "Verborgen" : blockedByRule(p) ? "Geblokkeerd" : "Zichtbaar"}
+                      </span>
                     </TableCell>
                     <TableCell>
                       <ProductRowActions
@@ -199,6 +258,7 @@ export default async function AdminProductsPage({
               })}
             </TableBody>
           </Table>
+          </AdminTableShell>
 
           {totalPages > 1 && (
             <div className="mt-6 flex items-center justify-center gap-4">

@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { cartItems, orderItems, orders } from "@/db/schema";
 import { getAppUserWithCompany } from "@/lib/auth";
+import { getShippingSettings, qualifiesForFreeShipping } from "@/lib/shipping";
 
 export type ActionResult = { ok: true; orderId: string } | { ok: false; error: string };
 
@@ -13,6 +14,8 @@ export type ActionResult = { ok: true; orderId: string } | { ok: false; error: s
  * collected here — shipping cost depends on the products/quantities
  * ordered, so an admin determines it afterwards and sends an invoice that
  * the customer pays by bank transfer (see lib/actions/admin-orders.ts).
+ * Orders above the free-shipping threshold get shipping fixed at 0 here,
+ * judged by the rule in force when the order was placed.
  */
 export async function placeOrder(): Promise<ActionResult> {
   const user = await getAppUserWithCompany();
@@ -34,6 +37,8 @@ export async function placeOrder(): Promise<ActionResult> {
     0,
   );
 
+  const freeShipping = qualifiesForFreeShipping(subtotalCents, await getShippingSettings());
+
   const [order] = await db
     .insert(orders)
     .values({
@@ -41,6 +46,7 @@ export async function placeOrder(): Promise<ActionResult> {
       placedByUserId: user.id,
       status: "placed",
       subtotalCents,
+      shippingCents: freeShipping ? 0 : null,
       totalCents: subtotalCents,
       currency: "EUR",
     })

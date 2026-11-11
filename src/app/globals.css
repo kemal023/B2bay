@@ -35,6 +35,15 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  /* Brand palette sampled from the logo: cyan #0090c0 and orange #f07020.
+     `primary` is a darkened cyan so white button text clears WCAG AA; these
+     keep the logo's actual hues for decorative use (gradients, icons, rules)
+     where contrast rules don't apply. */
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-strong: var(--brand-accent-strong);
+  --color-brand-accent-soft: var(--brand-accent-soft);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -53,18 +62,23 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.398 0.16 266);
+  --primary: oklch(0.536 0.111 233);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: oklch(0.945 0.008 231);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.955 0.02 266);
-  --accent-foreground: oklch(0.398 0.16 266);
+  --muted: oklch(0.945 0.008 231);
+  --muted-foreground: oklch(0.528 0.012 240);
+  --accent: oklch(0.962 0.025 231);
+  --accent-foreground: oklch(0.44 0.095 233);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.398 0.16 266);
+  --border: oklch(0.898 0.008 235);
+  --input: oklch(0.898 0.008 235);
+  --ring: oklch(0.536 0.111 233);
+  --brand: oklch(0.613 0.123 231);
+  --brand-soft: oklch(0.955 0.03 231);
+  --brand-accent: oklch(0.688 0.179 47);
+  --brand-accent-strong: oklch(0.553 0.174 38);
+  --brand-accent-soft: oklch(0.962 0.04 62);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -79,29 +93,39 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --background: oklch(1 0 0);
+  /* The page canvas is a faintly cool off-white while `--card` stays pure
+     white, so panels lift off the page instead of dissolving into it. Both
+     were #fff before, which is what made every screen read as flat. */
+  --background: oklch(0.974 0.005 235);
   --foreground: oklch(0.145 0 0);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  /* Same idea inverted: a cool near-black canvas with lighter panels on top,
+     tinted toward the brand hue so the dark UI is not flat neutral grey. */
+  --background: oklch(0.168 0.012 243);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: oklch(0.218 0.014 243);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.218 0.014 243);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.646 0.15 266);
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.269 0 0);
+  --primary: oklch(0.72 0.12 231);
+  --primary-foreground: oklch(0.17 0.02 233);
+  --secondary: oklch(0.278 0.014 243);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0.03 266);
-  --accent-foreground: oklch(0.85 0.08 266);
+  --muted: oklch(0.278 0.014 243);
+  --muted-foreground: oklch(0.715 0.015 243);
+  --accent: oklch(0.30 0.045 231);
+  --accent-foreground: oklch(0.86 0.09 231);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.646 0.15 266);
+  --ring: oklch(0.72 0.12 231);
+  --brand: oklch(0.72 0.12 231);
+  --brand-soft: oklch(0.28 0.04 231);
+  --brand-accent: oklch(0.75 0.16 50);
+  --brand-accent-strong: oklch(0.78 0.15 52);
+  --brand-accent-soft: oklch(0.30 0.05 50);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -126,5 +150,17 @@
   }
   html {
     @apply font-sans;
+  }
+}
+/* Invoices are saved to PDF through the browser's print dialog, so give the
+   page real A4 margins and drop the app's background from the output. */
+@media print {
+  @page {
+    size: A4;
+    margin: 16mm;
+  }
+
+  body {
+    background: #fff !important;
   }
 }

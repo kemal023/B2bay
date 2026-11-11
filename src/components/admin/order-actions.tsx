@@ -6,16 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   cancelOrder,
   invoiceOrder,
   markOrderFulfilled,
   markOrderPaid,
 } from "@/lib/actions/admin-orders";
-import { Ban, CheckCircle2, Loader2, Send } from "lucide-react";
+import { Ban, CheckCircle2, FileText, Loader2, Send } from "lucide-react";
 
-export function InvoiceForm({ orderId }: { orderId: string }) {
+export function InvoiceForm({
+  orderId,
+  freeShipping,
+}: {
+  orderId: string;
+  /** Placed above the free-shipping threshold: shipping is prefilled at 0. */
+  freeShipping: boolean;
+}) {
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(formData: FormData) {
@@ -27,31 +33,42 @@ export function InvoiceForm({ orderId }: { orderId: string }) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Verzendkosten &amp; factuur</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form action={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="shippingEuro">Verzendkosten (€)</Label>
-            <Input id="shippingEuro" name="shippingEuro" type="number" step="0.01" min="0" required />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="invoiceNumber">Factuurnummer</Label>
-            <Input id="invoiceNumber" name="invoiceNumber" placeholder="2026-0001" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="invoiceNotes">Notitie voor klant (optioneel)</Label>
-            <Textarea id="invoiceNotes" name="invoiceNotes" rows={3} />
-          </div>
-          <Button type="submit" disabled={isPending} className="w-full">
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Markeren als gefactureerd
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <section className="rounded-xl border border-border p-5">
+      <h3 className="flex items-center gap-2 text-sm font-semibold">
+        <FileText className="h-4 w-4 text-muted-foreground" />
+        Verzendkosten &amp; factuur
+      </h3>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Het factuurnummer en de btw worden automatisch toegevoegd.
+      </p>
+      <form action={handleSubmit} className="mt-4 space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="shippingEuro">Verzendkosten (€)</Label>
+          <Input
+            id="shippingEuro"
+            name="shippingEuro"
+            type="number"
+            step="0.01"
+            min="0"
+            required
+            defaultValue={freeShipping ? 0 : undefined}
+          />
+          {freeShipping && (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              Gratis verzending: deze bestelling kwam boven het drempelbedrag uit.
+            </p>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="invoiceNotes">Notitie voor klant (optioneel)</Label>
+          <Textarea id="invoiceNotes" name="invoiceNotes" rows={3} />
+        </div>
+        <Button type="submit" disabled={isPending} className="w-full">
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Factuur aanmaken
+        </Button>
+      </form>
+    </section>
   );
 }
 

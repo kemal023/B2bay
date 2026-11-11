@@ -3,16 +3,17 @@ import { ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getCartWithTotals } from "@/lib/actions/cart";
+import { getDictionary } from "@/lib/i18n/server";
 
 export async function CartLink() {
-  const { items } = await getCartWithTotals();
+  const [{ items }, { t }] = await Promise.all([getCartWithTotals(), getDictionary()]);
   const count = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
     <Button asChild variant="ghost" size="sm" className="relative">
       <Link href="/cart">
         <ShoppingCart className="h-4 w-4" />
-        Winkelmandje
+        {t.common.cart}
         {count > 0 && (
           <Badge className="absolute -right-1 -top-1 h-5 min-w-5 justify-center rounded-full px-1 text-[11px]">
             {count}

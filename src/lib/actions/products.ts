@@ -98,6 +98,11 @@ export async function updateProduct(id: string, formData: FormData): Promise<Act
         minOrderQty: Number.isFinite(f.minOrderQty) ? Math.max(1, Math.round(f.minOrderQty)) : 1,
         active: f.active,
         customized: true,
+        // The translation service re-derives the other language from what
+        // the admin typed (scripts/translate-catalog.mjs).
+        nameTrHash: null,
+        descTrHash: null,
+        catTrHash: null,
         updatedAt: new Date(),
       })
       .where(eq(products.id, id));

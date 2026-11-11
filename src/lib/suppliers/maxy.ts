@@ -23,6 +23,10 @@ const MAXY_BASE = "https://old.maxy.eu/edi/export-offer.php";
 // a couple of seasonal ones it apparently never bothered translating.
 const CATEGORY_TRANSLATIONS: Record<string, string> = {
   "Boże Narodzenie": "Christmas",
+  "Fotele biurowe": "Office chairs",
+  // Maxy's own internal bucket for delisted stock — not a real shelf, so it
+  // lands under the generic group rather than exposing it to customers.
+  "Produkty nieaktywne": "Other",
 };
 
 function buildUrl(client: string, token: string, shop: string): string {
@@ -60,6 +64,7 @@ type CurrentProduct = {
   nameEng: string;
   longDescEng: string;
   stockQty: number;
+  imageUrl: string;
   /** <iaiext:omnibus_price_wholesale> — the authoritative wholesale price. */
   omniPriceNet: number;
   /** Fallback only: the highest <size><price> seen, used when no product
@@ -86,6 +91,7 @@ async function streamProducts(url: string): Promise<NormalizedProduct[]> {
   let inDescription = false;
   let inSizes = false;
   let inWholesaleBlock = false;
+  let inImages = false;
   let field: TextField = null;
   let buf = "";
 
@@ -101,6 +107,7 @@ async function streamProducts(url: string): Promise<NormalizedProduct[]> {
           nameEng: "",
           longDescEng: "",
           stockQty: 0,
+          imageUrl: "",
           omniPriceNet: 0,
           sizePriceNet: 0,
         };
@@ -130,6 +137,18 @@ async function streamProducts(url: string): Promise<NormalizedProduct[]> {
         if (current && inSizes) {
           const qty = Number(node.attributes.quantity ?? 0);
           if (Number.isFinite(qty)) current.stockQty += qty;
+        }
+        break;
+      case "images":
+        inImages = true;
+        break;
+      case "image":
+      case "icon":
+        // Several same-photo entries repeat at different resolutions; keep
+        // only the first (highest-priority) one as the product thumbnail.
+        if (current && inImages && !current.imageUrl) {
+          const url = String(node.attributes.url ?? "");
+          if (url) current.imageUrl = url;
         }
         break;
       case "iaiext:omnibus_price_wholesale":
@@ -182,6 +201,8 @@ async function streamProducts(url: string): Promise<NormalizedProduct[]> {
       inSizes = false;
     } else if (tag === "iaiext:omnibus_price_wholesale") {
       inWholesaleBlock = false;
+    } else if (tag === "images") {
+      inImages = false;
     } else if (tag === "product") {
       const p = current;
       current = null;
@@ -196,6 +217,7 @@ async function streamProducts(url: string): Promise<NormalizedProduct[]> {
         ean: p.ean || undefined,
         name: p.nameEng,
         description: p.longDescEng ? stripHtml(p.longDescEng) : undefined,
+        imageUrl: p.imageUrl || undefined,
         category: p.category || undefined,
         unit: p.unit,
         costPriceCents: Math.round(priceNet * 100),

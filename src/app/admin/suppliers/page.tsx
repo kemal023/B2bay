@@ -3,9 +3,9 @@ import { getDb } from "@/db";
 import { products } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Card, CardContent } from "@/components/ui/card";
 import { SupplierForm } from "@/components/admin/supplier-form";
 import { SupplierRowActions } from "@/components/admin/supplier-row-actions";
+import { AdminPageHeader, AdminTableShell } from "@/components/admin/page-header";
 import { formatDate } from "@/lib/format";
 import { Plug } from "lucide-react";
 
@@ -27,63 +27,67 @@ export default async function AdminSuppliersPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold">Leveranciers &amp; API-koppelingen</h2>
-          <p className="text-sm text-muted-foreground">
-            Voeg een nieuwe leverancier-API toe om automatisch producten in de
-            catalogus te krijgen.
-          </p>
-        </div>
-        <SupplierForm />
-      </div>
+      <AdminPageHeader
+        title="Leveranciers & API-koppelingen"
+        description="Voeg een nieuwe leverancier-API toe om automatisch producten in de catalogus te krijgen."
+        action={<SupplierForm />}
+      />
 
       {allSuppliers.length === 0 ? (
-        <Card className="mt-8">
-          <CardContent className="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground">
-            <Plug className="h-10 w-10" />
-            <p>Nog geen leveranciers gekoppeld. Voeg er hierboven één toe.</p>
-          </CardContent>
-        </Card>
+        <div className="mt-8 flex flex-col items-center gap-4 rounded-xl border border-dashed border-border py-16 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            <Plug className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <div>
+            <p className="font-medium">Nog geen leveranciers gekoppeld</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Voeg er hierboven één toe om producten te synchroniseren.
+            </p>
+          </div>
+        </div>
       ) : (
-        <Table className="mt-6">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Leverancier</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Producten</TableHead>
-              <TableHead>Laatste sync</TableHead>
-              <TableHead className="text-right">Acties</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {allSuppliers.map((s) => (
-              <TableRow key={s.id}>
-                <TableCell>
-                  <div className="font-medium">{s.name}</div>
-                  <div className="text-xs text-muted-foreground">{s.baseUrl}</div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={s.active ? "default" : "secondary"}>
-                    {s.active ? "Actief" : "Inactief"}
-                  </Badge>
-                  {s.lastSyncError && (
-                    <p className="mt-1 max-w-64 truncate text-xs text-destructive" title={s.lastSyncError}>
-                      {s.lastSyncError}
-                    </p>
-                  )}
-                </TableCell>
-                <TableCell>{countBySupplier.get(s.id) ?? 0}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {s.lastSyncedAt ? formatDate(s.lastSyncedAt) : "Nog niet gesynchroniseerd"}
-                </TableCell>
-                <TableCell className="text-right">
-                  <SupplierRowActions id={s.id} active={s.active} />
-                </TableCell>
+        <AdminTableShell>
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableHead>Leverancier</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Producten</TableHead>
+                <TableHead>Laatste sync</TableHead>
+                <TableHead className="text-right">Acties</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {allSuppliers.map((s) => (
+                <TableRow key={s.id}>
+                  <TableCell>
+                    <div className="font-medium">{s.name}</div>
+                    <div className="text-xs text-muted-foreground">{s.baseUrl}</div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={s.active ? "default" : "secondary"}>
+                      {s.active ? "Actief" : "Inactief"}
+                    </Badge>
+                    {s.lastSyncError && (
+                      <p className="mt-1 max-w-64 truncate text-xs text-destructive" title={s.lastSyncError}>
+                        {s.lastSyncError}
+                      </p>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {(countBySupplier.get(s.id) ?? 0).toLocaleString("nl-NL")}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {s.lastSyncedAt ? formatDate(s.lastSyncedAt) : "Nog niet gesynchroniseerd"}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <SupplierRowActions id={s.id} active={s.active} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </AdminTableShell>
       )}
     </div>
   );

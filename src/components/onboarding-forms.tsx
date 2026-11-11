@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createCompany, joinCompany, type ActionResult } from "@/lib/actions/onboarding";
+import { useI18n } from "@/components/i18n-provider";
 
 const initialState: ActionResult = { ok: true };
 
@@ -20,40 +21,40 @@ export function OnboardingForms() {
     async (_: ActionResult, formData: FormData) => joinCompany(formData),
     initialState,
   );
+  const { t } = useI18n();
+  const o = t.onboarding;
 
   return (
     <Tabs defaultValue="create" className="w-full">
       <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="create">Nieuw bedrijf</TabsTrigger>
-        <TabsTrigger value="join">Bestaand bedrijf</TabsTrigger>
+        <TabsTrigger value="create">{o.newCompany}</TabsTrigger>
+        <TabsTrigger value="join">{o.existingCompany}</TabsTrigger>
       </TabsList>
 
       <TabsContent value="create">
         <Card>
           <CardHeader>
-            <CardTitle>Registreer je bedrijf</CardTitle>
-            <CardDescription>
-              We beoordelen elke aanvraag handmatig voordat bestellen mogelijk is.
-            </CardDescription>
+            <CardTitle>{o.registerTitle}</CardTitle>
+            <CardDescription>{o.registerDescription}</CardDescription>
           </CardHeader>
           <CardContent>
             <form action={createAction} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Bedrijfsnaam</Label>
+                <Label htmlFor="name">{o.companyName}</Label>
                 <Input id="name" name="name" required />
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="kvkNumber">KVK-nummer</Label>
+                  <Label htmlFor="kvkNumber">{o.kvk}</Label>
                   <Input id="kvkNumber" name="kvkNumber" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="vatNumber">Btw-nummer</Label>
+                  <Label htmlFor="vatNumber">{o.vat}</Label>
                   <Input id="vatNumber" name="vatNumber" />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="billingEmail">Facturatie-e-mail</Label>
+                <Label htmlFor="billingEmail">{o.billingEmail}</Label>
                 <Input id="billingEmail" name="billingEmail" type="email" />
               </div>
               {!createState.ok && (
@@ -62,7 +63,7 @@ export function OnboardingForms() {
                 </Alert>
               )}
               <Button type="submit" className="w-full" disabled={createPending}>
-                {createPending ? "Bezig..." : "Bedrijf registreren"}
+                {createPending ? t.common.busy : o.registerSubmit}
               </Button>
             </form>
           </CardContent>
@@ -72,15 +73,13 @@ export function OnboardingForms() {
       <TabsContent value="join">
         <Card>
           <CardHeader>
-            <CardTitle>Sluit aan bij je bedrijf</CardTitle>
-            <CardDescription>
-              Vraag de join-code op bij je collega die het bedrijfsaccount heeft aangemaakt.
-            </CardDescription>
+            <CardTitle>{o.joinTitle}</CardTitle>
+            <CardDescription>{o.joinDescription}</CardDescription>
           </CardHeader>
           <CardContent>
             <form action={joinAction} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="joinCode">Join-code</Label>
+                <Label htmlFor="joinCode">{o.joinCode}</Label>
                 <Input id="joinCode" name="joinCode" placeholder="AB3C-DEF4" required />
               </div>
               {!joinState.ok && (
@@ -89,7 +88,7 @@ export function OnboardingForms() {
                 </Alert>
               )}
               <Button type="submit" className="w-full" disabled={joinPending}>
-                {joinPending ? "Bezig..." : "Aansluiten"}
+                {joinPending ? t.common.busy : o.joinSubmit}
               </Button>
             </form>
           </CardContent>

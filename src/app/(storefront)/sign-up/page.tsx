@@ -1,27 +1,27 @@
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuthShell } from "@/components/auth-shell";
+import { getDictionary } from "@/lib/i18n/server";
 import { RegisterForm } from "@/components/auth-forms";
 
-export default function SignUpPage() {
+export default async function SignUpPage() {
+  const { t } = await getDictionary();
   return (
-    <div className="mx-auto flex max-w-sm flex-col justify-center px-4 py-16 sm:px-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Zakelijk account aanmaken</CardTitle>
-          <CardDescription>
-            Na het aanmaken koppel je direct je bedrijfsgegevens.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <RegisterForm />
-          <p className="mt-4 text-center text-sm text-muted-foreground">
-            Al een account?{" "}
-            <Link href="/sign-in" className="text-foreground underline">
-              Inloggen
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <AuthShell
+      title={t.auth.signUpTitle}
+      description={t.auth.signUpDescription}
+      footer={
+        <>
+          {t.auth.haveAccount}{" "}
+          <Link
+            href="/sign-in"
+            className="font-medium text-foreground underline underline-offset-2"
+          >
+            {t.common.signIn}
+          </Link>
+        </>
+      }
+    >
+      <RegisterForm />
+    </AuthShell>
   );
 }

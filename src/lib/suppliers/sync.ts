@@ -26,14 +26,18 @@ function sellPriceFromCost(costPriceCents: number, markupPercent: number): numbe
 // row-identifying columns, which differ: supplier_id+supplier_sku for a
 // fresh/normal upsert, vs. id for an EAN-linked relink).
 const COMMON_COLUMNS =
-  "ean, name, source_name, description, image_url, category, unit, cost_price_cents, price_cents, currency, stock_qty, min_order_qty";
+  "ean, name, source_name, description, source_description, image_url, category, source_category, unit, cost_price_cents, price_cents, currency, stock_qty, min_order_qty";
 
-// On every sync, `name`/`source_name` are set to the supplier's current raw
-// value. `source_name` always ends up holding that raw value; `name` only
-// does when the row is new — once a translated name diverges from
-// source_name, the CASE in each UPDATE below leaves `name` alone.
+// On every sync the source_* columns get the supplier's current raw text.
+// The customer-facing column only follows it for a new row, a field that was
+// never translated, or when the supplier actually changed the text — then
+// the stale translation is replaced by the new source and its "translated"
+// marker (*_tr_hash) cleared, so scripts/translate-catalog.mjs redoes it.
+// An unchanged source leaves an existing translation alone.
 function commonValues(item: NormalizedProduct, markupPercent: number) {
-  return sql`${item.ean ?? null}::text, ${item.name}::text, ${item.name}::text, ${item.description ?? null}::text, ${item.imageUrl ?? null}::text, ${item.category ?? null}::text, ${item.unit ?? "stuk"}::text, ${item.costPriceCents}::integer, ${sellPriceFromCost(item.costPriceCents, markupPercent)}::integer, ${item.currency ?? "EUR"}::text, ${item.stockQty}::integer, ${item.minOrderQty ?? 1}::integer`;
+  const description = item.description ?? null;
+  const category = item.category ?? null;
+  return sql`${item.ean ?? null}::text, ${item.name}::text, ${item.name}::text, ${description}::text, ${description}::text, ${item.imageUrl ?? null}::text, ${category}::text, ${category}::text, ${item.unit ?? "stuk"}::text, ${item.costPriceCents}::integer, ${sellPriceFromCost(item.costPriceCents, markupPercent)}::integer, ${item.currency ?? "EUR"}::text, ${item.stockQty}::integer, ${item.minOrderQty ?? 1}::integer`;
 }
 
 // Applies to both write paths: protects an admin-edited OR already-
@@ -46,10 +50,27 @@ const PROTECTED_SET = sql`
   active = true,
   updated_at = now(),
   source_name = excluded.source_name,
-  name = CASE WHEN products.customized OR products.name <> products.source_name THEN products.name ELSE excluded.name END,
-  description = CASE WHEN products.customized THEN products.description ELSE excluded.description END,
+  source_description = excluded.source_description,
+  source_category = excluded.source_category,
+  name = CASE
+    WHEN products.customized THEN products.name
+    WHEN products.source_name IS DISTINCT FROM excluded.source_name THEN excluded.name
+    WHEN products.name <> products.source_name THEN products.name
+    ELSE excluded.name END,
+  description = CASE
+    WHEN products.customized THEN products.description
+    WHEN products.source_description IS DISTINCT FROM excluded.source_description THEN excluded.description
+    WHEN products.description IS DISTINCT FROM products.source_description THEN products.description
+    ELSE excluded.description END,
   image_url = CASE WHEN products.customized THEN products.image_url ELSE excluded.image_url END,
-  category = CASE WHEN products.customized THEN products.category ELSE excluded.category END,
+  category = CASE
+    WHEN products.customized THEN products.category
+    WHEN products.source_category IS DISTINCT FROM excluded.source_category THEN excluded.category
+    WHEN products.category IS DISTINCT FROM products.source_category THEN products.category
+    ELSE excluded.category END,
+  name_tr_hash = CASE WHEN products.source_name IS DISTINCT FROM excluded.source_name THEN NULL ELSE products.name_tr_hash END,
+  desc_tr_hash = CASE WHEN products.source_description IS DISTINCT FROM excluded.source_description THEN NULL ELSE products.desc_tr_hash END,
+  cat_tr_hash = CASE WHEN products.source_category IS DISTINCT FROM excluded.source_category THEN NULL ELSE products.cat_tr_hash END,
   unit = CASE WHEN products.customized THEN products.unit ELSE excluded.unit END,
   price_cents = CASE WHEN products.customized THEN products.price_cents ELSE excluded.price_cents END,
   min_order_qty = CASE WHEN products.customized THEN products.min_order_qty ELSE excluded.min_order_qty END
@@ -71,7 +92,7 @@ async function upsertBySkuBatch(
 
   await db.execute(sql`
     INSERT INTO products (${sql.raw(columns)}, active, updated_at)
-    SELECT v.supplier_id, v.supplier_sku, v.ean, v.name, v.source_name, v.description, v.image_url, v.category, v.unit, v.cost_price_cents, v.price_cents, v.currency, v.stock_qty, v.min_order_qty, true, now()
+    SELECT v.supplier_id, v.supplier_sku, v.ean, v.name, v.source_name, v.description, v.source_description, v.image_url, v.category, v.source_category, v.unit, v.cost_price_cents, v.price_cents, v.currency, v.stock_qty, v.min_order_qty, true, now()
     FROM (VALUES ${sql.join(rows, sql`, `)}) AS v(${sql.raw(columns)})
     ON CONFLICT (supplier_id, supplier_sku) DO UPDATE SET ${PROTECTED_SET}
   `);

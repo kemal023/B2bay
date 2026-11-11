@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { removeCartItem, updateCartItemQuantity } from "@/lib/actions/cart";
 import { formatPriceCents } from "@/lib/format";
-import { Loader2, Trash2 } from "lucide-react";
+import { ImageOff, Loader2, Trash2 } from "lucide-react";
+import { useI18n } from "@/components/i18n-provider";
+import { fmt } from "@/lib/i18n/dictionaries";
+import { localizedName, localizedUnit } from "@/lib/product-text";
 
 type CartItem = {
   id: string;
@@ -15,6 +18,7 @@ type CartItem = {
   product: {
     id: string;
     name: string;
+    nameNl: string | null;
     imageUrl: string | null;
     unit: string;
     priceCents: number;
@@ -25,6 +29,9 @@ type CartItem = {
 
 export function CartItemRow({ item }: { item: CartItem }) {
   const [isPending, startTransition] = useTransition();
+  const { locale, t } = useI18n();
+  const name = localizedName(item.product, locale);
+  const unit = localizedUnit(item.product.unit, locale);
 
   function setQuantity(quantity: number) {
     startTransition(async () => {
@@ -41,37 +48,70 @@ export function CartItemRow({ item }: { item: CartItem }) {
   }
 
   return (
-    <div className="flex gap-4 rounded-lg border border-border p-4">
-      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-md bg-muted">
-        {item.product.imageUrl && (
+    <div className="flex gap-4 rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-sm">
+      <Link
+        href={`/products/${item.product.id}`}
+        className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-border bg-white p-2"
+      >
+        {item.product.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- supplier image domains are dynamic
-          <img src={item.product.imageUrl} alt="" className="h-full w-full object-cover" />
+          <img
+            src={item.product.imageUrl}
+            alt=""
+            className="h-full w-full object-contain"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-zinc-300">
+            <ImageOff className="h-6 w-6" />
+          </div>
         )}
-      </div>
+      </Link>
 
-      <div className="flex flex-1 flex-col justify-between">
-        <div>
-          <Link href={`/products/${item.product.id}`} className="font-medium hover:underline">
-            {item.product.name}
+      <div className="flex min-w-0 flex-1 flex-col justify-between gap-3">
+        <div className="min-w-0">
+          <Link
+            href={`/products/${item.product.id}`}
+            className="line-clamp-2 text-sm font-medium leading-snug transition-colors hover:text-primary"
+          >
+            {name}
           </Link>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {fmt(t.cart.unitLine, {
+              price: formatPriceCents(item.product.priceCents, item.product.currency),
+              unit,
+              qty: item.product.minOrderQty,
+            })}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2">
           <Input
             type="number"
             min={item.product.minOrderQty}
             value={item.quantity}
             onChange={(e) => setQuantity(Math.max(0, Number(e.target.value) || 0))}
-            className="w-20"
+            className="h-9 w-20"
             disabled={isPending}
+            aria-label={t.product.quantity}
           />
-          <Button variant="ghost" size="icon" onClick={remove} disabled={isPending} aria-label="Verwijderen">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={remove}
+            disabled={isPending}
+            aria-label={t.cart.remove}
+            className="text-muted-foreground hover:text-destructive"
+          >
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
           </Button>
         </div>
       </div>
 
-      <div className="text-right font-medium">
-        {formatPriceCents(item.product.priceCents * item.quantity, item.product.currency)}
+      <div className="shrink-0 text-right">
+        <div className="font-semibold tabular-nums">
+          {formatPriceCents(item.product.priceCents * item.quantity, item.product.currency)}
+        </div>
+        <div className="mt-0.5 text-xs text-muted-foreground">{t.cart.exclVat}</div>
       </div>
     </div>
   );

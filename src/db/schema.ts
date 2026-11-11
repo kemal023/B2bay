@@ -116,6 +116,11 @@ export const suppliers = pgTable(
     // when it's first imported. Purely a starting point — admins can then
     // fine-tune the sell price per product from /admin/products.
     defaultMarkupPercent: integer("default_markup_percent").notNull().default(30),
+    // Language of the names and descriptions this supplier sends ("pl",
+    // "en", …), or "auto" to detect it per product. Drives the translation
+    // service (scripts/translate-catalog.mjs); only languages loaded into
+    // LibreTranslate (LT_LOAD_ONLY in docker-compose.yml) can be translated.
+    sourceLanguage: text("source_language").notNull().default("auto"),
     active: boolean("active").notNull().default(true),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     lastSyncError: text("last_sync_error"),
@@ -160,9 +165,35 @@ export const products = pgTable(
     // previous sourceName — so a translated name is never clobbered by a
     // later sync, without needing the `customized` flag.
     sourceName: text("source_name"),
+    // Dutch translation of `name`, denormalised onto the product so the
+    // catalogue can sort and search on it directly instead of joining the
+    // translation cache for every row.
+    nameNl: text("name_nl"),
+    // English description. For a non-English supplier it starts out as the
+    // raw source text and is replaced by the translation; the storefront
+    // never shows it while it still equals sourceDescription in a foreign
+    // language (see lib/product-text.ts).
     description: text("description"),
+    descriptionNl: text("description_nl"),
+    // Raw supplier text, refreshed on every sync — same contract as
+    // sourceName: the customer-facing field is only overwritten while it
+    // still equals the previous source value.
+    sourceDescription: text("source_description"),
     imageUrl: text("image_url"),
     category: text("category"),
+    categoryNl: text("category_nl"),
+    sourceCategory: text("source_category"),
+    // Detected or configured language of the source_* fields.
+    sourceLang: text("source_lang"),
+    // md5 of the inputs each field was last translated from. When a sync
+    // changes the source text (or an admin edits the English), the hash no
+    // longer matches and the translation service redoes just that field.
+    nameTrHash: text("name_tr_hash"),
+    descTrHash: text("desc_tr_hash"),
+    catTrHash: text("cat_tr_hash"),
+    // Set when a visitor opens a product whose description is not translated
+    // yet, so the translation service handles it before the backlog.
+    translationPriority: timestamp("translation_priority", { withTimezone: true }),
     unit: text("unit").notNull().default("stuk"),
     // What we pay the supplier. Null for products with no supplier (added by hand).
     costPriceCents: integer("cost_price_cents"),
@@ -197,13 +228,19 @@ export const translations = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     sourceLang: text("source_lang").notNull(),
+    // The cache originally only ever ran pl -> en, so the target was implicit.
+    // With Dutch added it has to be part of the key, otherwise an English and
+    // a Dutch translation of the same source text collide.
+    targetLang: text("target_lang").notNull().default("en"),
     sourceText: text("source_text").notNull(),
     translatedText: text("translated_text").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
-  (t) => [uniqueIndex("translations_source_idx").on(t.sourceLang, t.sourceText)],
+  (t) => [
+    uniqueIndex("translations_source_idx").on(t.sourceLang, t.targetLang, t.sourceText),
+  ],
 );
 
 /** One line in a company's persistent shopping cart. */
@@ -240,6 +277,15 @@ export const orders = pgTable("orders", {
   // subtotalCents + shippingCents once shipping is known, else subtotalCents.
   totalCents: integer("total_cents").notNull(),
   currency: text("currency").notNull().default("EUR"),
+  // Set when the invoice is created. The rate is stored alongside the amount
+  // because an invoice is a legal record: changing the rate in settings later
+  // must never alter what an already-issued invoice says.
+  vatCents: integer("vat_cents"),
+  vatRatePercent: integer("vat_rate_percent"),
+  // The seller's name, address and fiscal identifiers exactly as they stood
+  // when the invoice was issued. Read live, a later address or bank change
+  // would silently rewrite every invoice ever sent.
+  sellerSnapshot: jsonb("seller_snapshot").$type<Record<string, unknown>>(),
   invoiceNumber: text("invoice_number"),
   invoiceNotes: text("invoice_notes"),
   invoicedAt: timestamp("invoiced_at", { withTimezone: true }),
@@ -247,7 +293,7 @@ export const orders = pgTable("orders", {
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+}, (t) => [uniqueIndex("orders_invoice_number_idx").on(t.invoiceNumber)]);
 
 export const orderItems = pgTable("order_items", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -328,3 +374,17 @@ export const orderItemsRelations = relations(orderItems, ({ one }) => ({
     references: [suppliers.id],
   }),
 }));
+
+/**
+ * Key/value store for platform-wide rules an admin configures at runtime
+ * (see lib/rules.ts and /admin/rules). Kept as one row per rule group with a
+ * JSON body so a new rule is a field in a typed object rather than a
+ * migration — the schema here stays stable while the rule set grows.
+ */
+export const settings = pgTable("settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").$type<Record<string, unknown>>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
