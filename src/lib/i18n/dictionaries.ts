@@ -317,6 +317,7 @@ const nl = {
     free: "Gratis",
     awaitingBody:
       "We bepalen de verzendkosten op basis van je bestelling en sturen je binnenkort een factuur om per bank over te maken.",
+    creditNotes: "Creditnota's",
     invoiceTitle: "Factuur {number}",
     invoiceBody: "Bekijk of download je factuur en maak het totaalbedrag over.",
     viewInvoice: "Factuur bekijken",
@@ -709,6 +710,7 @@ const en: Dictionary = {
     free: "Free",
     awaitingBody:
       "We determine the shipping costs based on your order and will shortly send you an invoice to pay by bank transfer.",
+    creditNotes: "Credit notes",
     invoiceTitle: "Invoice {number}",
     invoiceBody: "View or download your invoice and transfer the total amount.",
     viewInvoice: "View invoice",

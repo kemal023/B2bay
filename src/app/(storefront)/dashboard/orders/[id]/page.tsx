@@ -33,7 +33,7 @@ export default async function OrderDetailPage({
   const db = getDb();
   const order = await db.query.orders.findFirst({
     where: eq(orders.id, id),
-    with: { items: true },
+    with: { items: true, creditNotes: { orderBy: (c, { asc }) => asc(c.createdAt) } },
   });
 
   if (!order || order.companyId !== user.company.id) notFound();
@@ -120,6 +120,25 @@ export default async function OrderDetailPage({
               <Download className="h-4 w-4" />
             </Link>
           </Button>
+        </div>
+      )}
+
+      {order.creditNotes.length > 0 && (
+        <div className="mt-6 rounded-xl border border-border bg-card p-5 shadow-sm">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {o.creditNotes}
+          </p>
+          <ul className="space-y-1.5 text-sm">
+            {order.creditNotes.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-3">
+                <Link href={`/invoices/credit/${c.id}`} className="font-medium hover:underline">
+                  {c.number}
+                  <span className="ml-2 font-normal text-muted-foreground">{c.reason}</span>
+                </Link>
+                <span className="tabular-nums">−{formatPriceCents(c.totalCents, order.currency)}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

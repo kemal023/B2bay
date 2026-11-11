@@ -182,3 +182,16 @@ export async function getOrderForInvoice(orderId: string) {
     with: { items: true, company: true },
   });
 }
+
+/** Next credit note number: its own gap-free yearly series, C2026-0001, ... */
+export async function nextCreditNoteNumber(): Promise<string> {
+  const db = getDb();
+  const prefix = `C${new Date().getFullYear()}-`;
+  const rows = await db.execute<{ max_seq: number | null }>(sql`
+    SELECT MAX(NULLIF(split_part(number, '-', 2), '')::int) AS max_seq
+    FROM credit_notes
+    WHERE number LIKE ${prefix + "%"}
+  `);
+  const next = Number(rows.rows[0]?.max_seq ?? 0) + 1;
+  return `${prefix}${String(next).padStart(4, "0")}`;
+}

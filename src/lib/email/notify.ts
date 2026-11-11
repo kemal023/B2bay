@@ -2,7 +2,7 @@ import "server-only";
 import { after } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { companies, orders, users } from "@/db/schema";
+import { companies, creditNotes, orders, users } from "@/db/schema";
 import { formatDate, formatDateOnly, formatPriceCents } from "@/lib/format";
 import { getCompanyDetails, invoiceDueDate } from "@/lib/invoicing";
 import { isLocale, type Locale } from "@/lib/i18n/config";
@@ -12,6 +12,7 @@ import {
   adminNewCompanyEmail,
   adminNewOrderEmail,
   companyApprovedEmail,
+  creditNoteEmail,
   invoiceIssuedEmail,
   orderShippedEmail,
 } from "@/lib/email/templates";
@@ -128,6 +129,28 @@ export function notifyOrderShipped(orderId: string) {
       carrier: carrierName(order.carrier),
       trackingCode: order.trackingCode,
       trackingUrl: order.trackingUrl,
+    });
+  });
+}
+
+export function notifyCreditNote(creditNoteId: string) {
+  later(async () => {
+    const db = getDb();
+    const note = await db.query.creditNotes.findFirst({
+      where: eq(creditNotes.id, creditNoteId),
+      with: { order: { with: { company: true, placedBy: true } } },
+    });
+    if (!note?.order.invoiceNumber) return null;
+    const { order } = note;
+    const to = [
+      ...new Set([order.placedBy?.email, order.company.billingEmail].filter((e): e is string => !!e)),
+    ];
+    return creditNoteEmail(to, localeOf(order.placedBy?.locale), {
+      number: note.number,
+      invoiceNumber: order.invoiceNumber!,
+      total: formatPriceCents(note.totalCents, order.currency),
+      reason: note.reason,
+      id: note.id,
     });
   });
 }

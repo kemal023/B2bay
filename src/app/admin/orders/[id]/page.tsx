@@ -6,7 +6,12 @@ import { orders } from "@/db/schema";
 import { formatDate, formatPriceCents } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { InvoiceForm, OrderStatusActions, ShipOrderForm } from "@/components/admin/order-actions";
+import {
+  CreditNoteForm,
+  InvoiceForm,
+  OrderStatusActions,
+  ShipOrderForm,
+} from "@/components/admin/order-actions";
 import { carrierName } from "@/lib/shipping-carriers";
 import { deliveryFor } from "@/lib/delivery";
 import { AddressBlock } from "@/components/address-block";
@@ -66,11 +71,14 @@ export default async function AdminOrderDetailPage({
     with: {
       items: { with: { supplier: { columns: { name: true, baseUrl: true } } } },
       company: true,
+      creditNotes: { orderBy: (c, { asc }) => asc(c.createdAt) },
     },
   });
 
   if (!order) notFound();
   const delivery = deliveryFor(order);
+  const creditable =
+    order.subtotalCents + (order.shippingCents ?? 0) - order.creditNotes.reduce((s, c) => s + c.netCents, 0);
 
   const bySupplier = new Map<
     string,
@@ -307,6 +315,32 @@ export default async function AdminOrderDetailPage({
 
           {(order.status === "invoiced" || order.status === "paid") && (
             <ShipOrderForm orderId={order.id} />
+          )}
+
+          {order.invoiceNumber && (
+            <section className="rounded-xl border border-border p-5">
+              <h3 className="flex items-center gap-2 text-sm font-semibold">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Creditnota&apos;s
+              </h3>
+              {order.creditNotes.length === 0 ? (
+                <p className="mt-2 text-xs text-muted-foreground">Nog geen creditnota&apos;s.</p>
+              ) : (
+                <ul className="mt-3 space-y-2 text-sm">
+                  {order.creditNotes.map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-3">
+                      <Link href={`/invoices/credit/${c.id}`} className="font-medium hover:underline">
+                        {c.number}
+                      </Link>
+                      <span className="tabular-nums text-muted-foreground">
+                        −{formatPriceCents(c.totalCents, order.currency)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {creditable > 0 && <CreditNoteForm orderId={order.id} maxNetCents={creditable} />}
+            </section>
           )}
 
           {order.status === "fulfilled" && (

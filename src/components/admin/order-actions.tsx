@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   cancelOrder,
+  createCreditNote,
   invoiceOrder,
   markOrderFulfilled,
   markOrderPaid,
 } from "@/lib/actions/admin-orders";
-import { Ban, CheckCircle2, FileText, Loader2, Send, Truck } from "lucide-react";
+import { Ban, CheckCircle2, FileMinus, FileText, Loader2, Send, Truck } from "lucide-react";
 import { CARRIERS } from "@/lib/shipping-carriers";
 
 export function InvoiceForm({
@@ -162,5 +163,48 @@ export function ShipOrderForm({ orderId }: { orderId: string }) {
         </Button>
       </form>
     </section>
+  );
+}
+
+/** Credit (part of) an invoiced order; the remaining creditable amount is the default. */
+export function CreditNoteForm({ orderId, maxNetCents }: { orderId: string; maxNetCents: number }) {
+  const [isPending, startTransition] = useTransition();
+
+  function handleSubmit(formData: FormData) {
+    startTransition(async () => {
+      const result = await createCreditNote(orderId, formData);
+      if (result.ok) toast.success("Creditnota aangemaakt en naar de klant gemaild");
+      else toast.error(result.error);
+    });
+  }
+
+  return (
+    <form action={handleSubmit} className="mt-4 space-y-3 border-t border-border pt-4">
+      <p className="text-xs text-muted-foreground">
+        Nieuwe creditnota — nog maximaal {(maxNetCents / 100).toFixed(2).replace(".", ",")} euro excl. btw.
+        De btw volgt de oorspronkelijke factuur.
+      </p>
+      <div className="space-y-2">
+        <Label htmlFor="amountEuro">Bedrag excl. btw (€)</Label>
+        <Input
+          id="amountEuro"
+          name="amountEuro"
+          type="number"
+          step="0.01"
+          min="0.01"
+          max={maxNetCents / 100}
+          defaultValue={(maxNetCents / 100).toFixed(2)}
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="reason">Reden (staat op de creditnota)</Label>
+        <Input id="reason" name="reason" placeholder="Retour: 2 stuks beschadigd" required />
+      </div>
+      <Button type="submit" variant="outline" disabled={isPending} className="w-full">
+        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileMinus className="h-4 w-4" />}
+        Creditnota maken
+      </Button>
+    </form>
   );
 }

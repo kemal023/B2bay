@@ -249,3 +249,45 @@ export function adminNewOrderEmail(
     to,
   );
 }
+
+export function creditNoteEmail(
+  to: string | string[],
+  locale: Locale,
+  note: { number: string; invoiceNumber: string; total: string; reason: string; id: string },
+): Email {
+  const url = appUrl(`/invoices/credit/${note.id}`);
+  return render(
+    locale !== "nl"
+      ? {
+          subject: `Credit note ${note.number}`,
+          heading: `Credit note ${note.number}`,
+          paragraphs: [
+            `We have issued a credit note against invoice ${note.invoiceNumber}. Reason: ${note.reason}`,
+            "The amount will be settled with you; you can view and download the credit note via the button below.",
+          ],
+          details: [
+            ["Credit note", note.number],
+            ["Invoice", note.invoiceNumber],
+            ["Amount credited", note.total],
+          ],
+          button: { label: "View credit note", url },
+          footer: footer(locale),
+        }
+      : {
+          subject: `Creditnota ${note.number}`,
+          heading: `Creditnota ${note.number}`,
+          paragraphs: [
+            `We hebben een creditnota gemaakt op factuur ${note.invoiceNumber}. Reden: ${note.reason}`,
+            "Het bedrag wordt met je verrekend; je kunt de creditnota bekijken en downloaden via de knop hieronder.",
+          ],
+          details: [
+            ["Creditnota", note.number],
+            ["Factuur", note.invoiceNumber],
+            ["Gecrediteerd bedrag", note.total],
+          ],
+          button: { label: "Creditnota bekijken", url },
+          footer: footer(locale),
+        },
+    to,
+  );
+}

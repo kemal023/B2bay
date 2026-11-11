@@ -315,6 +315,7 @@ export const fr: Dictionary = {
     free: "Gratuit",
     awaitingBody:
       "Nous calculons les frais de port selon votre commande et vous enverrons sous peu une facture à régler par virement.",
+    creditNotes: "Avoirs",
     invoiceTitle: "Facture {number}",
     invoiceBody: "Consultez ou téléchargez votre facture et virez le montant total.",
     viewInvoice: "Voir la facture",

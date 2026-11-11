@@ -104,6 +104,30 @@ export const sessions = pgTable("sessions", {
     .defaultNow(),
 }, (t) => [uniqueIndex("sessions_token_hash_idx").on(t.tokenHash)]);
 
+/**
+ * A credit note (creditfactuur) against an invoiced order: a refund or
+ * correction. Invoices are never edited once issued; a mistake or a return is
+ * corrected with a credit note in its own numbered series (C2026-0001, ...).
+ * Amounts are stored as positive numbers and printed as negative.
+ */
+export const creditNotes = pgTable(
+  "credit_notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderId: uuid("order_id")
+      .notNull()
+      .references(() => orders.id, { onDelete: "restrict" }),
+    number: text("number").notNull(),
+    reason: text("reason").notNull(),
+    netCents: integer("net_cents").notNull(),
+    vatRatePercent: integer("vat_rate_percent").notNull(),
+    vatCents: integer("vat_cents").notNull(),
+    totalCents: integer("total_cents").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("credit_notes_number_idx").on(t.number)],
+);
+
 /** A product a company keeps on its favourites list (shared by its users). */
 export const favorites = pgTable(
   "favorites",
@@ -399,6 +423,10 @@ export const orderItems = pgTable("order_items", {
   quantity: integer("quantity").notNull(),
 });
 
+export const creditNotesRelations = relations(creditNotes, ({ one }) => ({
+  order: one(orders, { fields: [creditNotes.orderId], references: [orders.id] }),
+}));
+
 export const favoritesRelations = relations(favorites, ({ one }) => ({
   company: one(companies, { fields: [favorites.companyId], references: [companies.id] }),
   product: one(products, { fields: [favorites.productId], references: [products.id] }),
@@ -462,6 +490,7 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
     references: [users.id],
   }),
   items: many(orderItems),
+  creditNotes: many(creditNotes),
 }));
 
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({

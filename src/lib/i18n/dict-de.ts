@@ -315,6 +315,7 @@ export const de: Dictionary = {
     free: "Kostenlos",
     awaitingBody:
       "Wir ermitteln die Versandkosten anhand Ihrer Bestellung und senden Ihnen in Kürze eine Rechnung zur Zahlung per Überweisung.",
+    creditNotes: "Gutschriften",
     invoiceTitle: "Rechnung {number}",
     invoiceBody: "Sehen Sie Ihre Rechnung ein oder laden Sie sie herunter und überweisen Sie den Gesamtbetrag.",
     viewInvoice: "Rechnung ansehen",

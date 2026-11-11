@@ -3,15 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { orders } from "@/db/schema";
+import { creditNotes, orders } from "@/db/schema";
 import { isPlatformAdmin } from "@/lib/auth";
 import {
   computeInvoiceTotals,
   getCompanyDetails,
   missingCompanyFields,
+  nextCreditNoteNumber,
   nextInvoiceNumber,
 } from "@/lib/invoicing";
-import { notifyInvoiceIssued, notifyOrderShipped } from "@/lib/email/notify";
+import { notifyCreditNote, notifyInvoiceIssued, notifyOrderShipped } from "@/lib/email/notify";
 import { trackingUrlFor } from "@/lib/shipping-carriers";
 import { deliveryFor } from "@/lib/delivery";
 import { recheckCompanyVat } from "@/lib/company-billing";
@@ -199,6 +200,61 @@ export async function cancelOrder(orderId: string): Promise<ActionResult> {
     await requireAdmin();
     const db = getDb();
     await db.update(orders).set({ status: "cancelled" }).where(eq(orders.id, orderId));
+    revalidateOrder(orderId);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Onbekende fout." };
+  }
+}
+
+/**
+ * Issues a credit note against an invoiced order, for (part of) its net
+ * amount, at the VAT rate of the original invoice. The total credited can
+ * never exceed what was invoiced.
+ */
+export async function createCreditNote(orderId: string, formData: FormData): Promise<ActionResult> {
+  try {
+    await requireAdmin();
+    const db = getDb();
+    const amountEuro = Number(String(formData.get("amountEuro") ?? "").replace(",", "."));
+    const reason = String(formData.get("reason") ?? "").trim();
+    if (!reason) return { ok: false, error: "Geef een reden op; die staat op de creditnota." };
+    if (!Number.isFinite(amountEuro) || amountEuro <= 0) {
+      return { ok: false, error: "Vul een bedrag groter dan 0 in." };
+    }
+
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+      with: { creditNotes: true },
+    });
+    if (!order?.invoiceNumber) return { ok: false, error: "Alleen een gefactureerde bestelling kan gecrediteerd worden." };
+
+    const invoicedNet = order.subtotalCents + (order.shippingCents ?? 0);
+    const alreadyCredited = order.creditNotes.reduce((s, c) => s + c.netCents, 0);
+    const netCents = Math.round(amountEuro * 100);
+    if (alreadyCredited + netCents > invoicedNet) {
+      return {
+        ok: false,
+        error: `Er kan nog maximaal ${((invoicedNet - alreadyCredited) / 100).toFixed(2).replace(".", ",")} euro (excl. btw) gecrediteerd worden.`,
+      };
+    }
+
+    const vatRatePercent = order.vatRatePercent ?? 0;
+    const totals = computeInvoiceTotals(netCents, 0, vatRatePercent);
+    const [note] = await db
+      .insert(creditNotes)
+      .values({
+        orderId,
+        number: await nextCreditNoteNumber(),
+        reason,
+        netCents,
+        vatRatePercent,
+        vatCents: totals.vatCents,
+        totalCents: totals.totalCents,
+      })
+      .returning();
+
+    notifyCreditNote(note.id);
     revalidateOrder(orderId);
     return { ok: true };
   } catch (err) {
