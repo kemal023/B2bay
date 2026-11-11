@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { createCompany, joinCompany, type ActionResult } from "@/lib/actions/onboarding";
 import { useI18n } from "@/components/i18n-provider";
+import { BillingFields } from "@/components/billing-fields";
 
 const initialState: ActionResult = { ok: true };
 
@@ -43,16 +44,11 @@ export function OnboardingForms() {
                 <Label htmlFor="name">{o.companyName}</Label>
                 <Input id="name" name="name" required />
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="kvkNumber">{o.kvk}</Label>
-                  <Input id="kvkNumber" name="kvkNumber" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vatNumber">{o.vat}</Label>
-                  <Input id="vatNumber" name="vatNumber" />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="kvkNumber">{o.kvk}</Label>
+                <Input id="kvkNumber" name="kvkNumber" />
               </div>
+              <BillingFields />
               <div className="space-y-2">
                 <Label htmlFor="billingEmail">{o.billingEmail}</Label>
                 <Input id="billingEmail" name="billingEmail" type="email" />

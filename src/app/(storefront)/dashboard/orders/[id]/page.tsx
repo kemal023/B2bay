@@ -124,7 +124,9 @@ export default async function OrderDetailPage({
           </div>
           {order.vatCents != null && (
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">{fmt(o.vat, { rate: order.vatRatePercent ?? 0 })}</span>
+              <span className="text-muted-foreground">{order.vatTreatment === "reverse_charge"
+                  ? o.vatReverseCharge
+                  : fmt(o.vat, { rate: order.vatRatePercent ?? 0 })}</span>
               <span className="tabular-nums">
                 {formatPriceCents(order.vatCents, order.currency)}
               </span>

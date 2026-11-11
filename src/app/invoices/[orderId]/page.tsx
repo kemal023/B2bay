@@ -10,6 +10,18 @@ import {
 import { formatDateOnly, formatPriceCents } from "@/lib/format";
 import { PrintButton } from "@/components/print-button";
 import { SiteLogo } from "@/components/site-logo";
+import { countryName } from "@/lib/vat";
+
+type BuyerSnapshot = {
+  name: string;
+  addressLine: string | null;
+  postalCode: string | null;
+  city: string | null;
+  country: string | null;
+  kvkNumber: string | null;
+  vatNumber: string | null;
+  billingEmail: string | null;
+};
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +52,9 @@ export default async function InvoicePage({
   const shippingCents = order.shippingCents ?? 0;
   const netCents = order.subtotalCents + shippingCents;
   const dueDate = invoiceDueDate(order.invoicedAt, seller.paymentTermDays);
-  const buyer = order.company;
+  // The buyer as it was when invoiced; invoices from before snapshots use the live record.
+  const buyer = (order.buyerSnapshot as BuyerSnapshot | null) ?? order.company;
+  const reverseCharge = order.vatTreatment === "reverse_charge";
 
   return (
     <div className="min-h-screen bg-muted/40 py-8 print:bg-white print:py-0">
@@ -109,9 +123,16 @@ export default async function InvoicePage({
             </h2>
             <address className="mt-3 text-sm not-italic leading-relaxed">
               <div className="font-medium">{buyer.name}</div>
-              {buyer.billingEmail && <div className="text-zinc-600">{buyer.billingEmail}</div>}
+              {buyer.addressLine && <div>{buyer.addressLine}</div>}
+              {(buyer.postalCode || buyer.city) && (
+                <div>
+                  {buyer.postalCode} {buyer.city}
+                </div>
+              )}
+              {buyer.country && <div>{countryName(buyer.country)}</div>}
+              {buyer.billingEmail && <div className="mt-2 text-zinc-600">{buyer.billingEmail}</div>}
               {buyer.kvkNumber && <div className="text-zinc-600">KVK: {buyer.kvkNumber}</div>}
-              {buyer.vatNumber && <div className="text-zinc-600">Btw: {buyer.vatNumber}</div>}
+              {buyer.vatNumber && <div className="text-zinc-600">Btw-nr.: {buyer.vatNumber}</div>}
             </address>
           </section>
 
@@ -159,7 +180,7 @@ export default async function InvoicePage({
                 <dd className="tabular-nums">{formatPriceCents(netCents, order.currency)}</dd>
               </div>
               <div className="flex justify-between gap-6">
-                <dt className="text-zinc-600">Btw {vatRate}%</dt>
+                <dt className="text-zinc-600">{reverseCharge ? "Btw verlegd (0%)" : `Btw ${vatRate}%`}</dt>
                 <dd className="tabular-nums">{formatPriceCents(vatCents, order.currency)}</dd>
               </div>
               <div className="flex justify-between gap-6 border-t-2 border-zinc-900 pt-2 text-base font-semibold">
@@ -170,6 +191,17 @@ export default async function InvoicePage({
               </div>
             </dl>
           </section>
+
+          {reverseCharge && (
+            <p className="mt-6 rounded-lg border border-zinc-200 p-4 text-sm leading-relaxed">
+              <span className="font-semibold">Btw verlegd</span> — intracommunautaire levering, art. 138
+              Richtlijn 2006/112/EG. De btw wordt verlegd naar de afnemer ({buyer.vatNumber}).
+              <br />
+              <span className="text-zinc-600">
+                VAT reverse charge — intra-Community supply of goods, Art. 138 Directive 2006/112/EC.
+              </span>
+            </p>
+          )}
 
           <section className="mt-10 rounded-lg bg-zinc-50 p-5 text-sm print:border print:border-zinc-200">
             <h2 className="font-semibold">Betaalgegevens</h2>

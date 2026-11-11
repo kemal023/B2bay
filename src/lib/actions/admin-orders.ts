@@ -12,6 +12,8 @@ import {
   nextInvoiceNumber,
 } from "@/lib/invoicing";
 import { notifyInvoiceIssued, notifyOrderShipped } from "@/lib/email/notify";
+import { recheckCompanyVat } from "@/lib/company-billing";
+import { isEuCountry, SELLER_COUNTRY, VIES_MAX_AGE_MS, vatTreatmentFor } from "@/lib/vat";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -47,7 +49,10 @@ export async function invoiceOrder(
       return { ok: false, error: "Ongeldige verzendkosten." };
     }
 
-    const order = await db.query.orders.findFirst({ where: eq(orders.id, orderId) });
+    const order = await db.query.orders.findFirst({
+      where: eq(orders.id, orderId),
+      with: { company: true },
+    });
     if (!order) return { ok: false, error: "Bestelling niet gevonden." };
     if (order.invoiceNumber) {
       return { ok: false, error: "Deze bestelling heeft al een factuur." };
@@ -62,11 +67,38 @@ export async function invoiceOrder(
       };
     }
 
+    let buyer = order.company;
+    if (!buyer.addressLine || !buyer.postalCode || !buyer.city) {
+      return {
+        ok: false,
+        error: `Vul eerst het adres van ${buyer.name} in bij Zakelijke accounts — dat moet op de factuur.`,
+      };
+    }
+
+    // Cross-border EU buyer with a VAT number: confirm it in VIES (again, if
+    // the last confirmation is old) before deciding on reverse charge.
+    const crossBorder = isEuCountry(buyer.country) && buyer.country !== SELLER_COUNTRY;
+    const fresh =
+      buyer.vatStatus === "valid" &&
+      buyer.vatCheckedAt != null &&
+      Date.now() - buyer.vatCheckedAt.getTime() < VIES_MAX_AGE_MS;
+    if (crossBorder && buyer.vatNumber && !fresh) {
+      const check = await recheckCompanyVat(buyer.id);
+      if (check === "unavailable") {
+        return {
+          ok: false,
+          error: "VIES is nu niet bereikbaar, dus het btw-nummer kan niet bevestigd worden. Probeer het over een paar minuten opnieuw.",
+        };
+      }
+      if (check) buyer = { ...buyer, ...check };
+    }
+
+    const vatTreatment = vatTreatmentFor(buyer);
     const shippingCents = Math.round(shippingEuro * 100);
     const totals = computeInvoiceTotals(
       order.subtotalCents,
       shippingCents,
-      details.vatRatePercent,
+      vatTreatment === "reverse_charge" ? 0 : details.vatRatePercent,
     );
     const invoiceNumber = await nextInvoiceNumber();
 
@@ -77,6 +109,17 @@ export async function invoiceOrder(
         vatCents: totals.vatCents,
         vatRatePercent: totals.vatRatePercent,
         sellerSnapshot: details,
+        vatTreatment,
+        buyerSnapshot: {
+          name: buyer.name,
+          addressLine: buyer.addressLine,
+          postalCode: buyer.postalCode,
+          city: buyer.city,
+          country: buyer.country,
+          kvkNumber: buyer.kvkNumber,
+          vatNumber: buyer.vatNumber,
+          billingEmail: buyer.billingEmail,
+        },
         totalCents: totals.totalCents,
         status: "invoiced",
         invoiceNumber,

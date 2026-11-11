@@ -11,6 +11,7 @@ import { getDictionary } from "@/lib/i18n/server";
 import { intlLocale } from "@/lib/i18n/config";
 import { fmt, plural } from "@/lib/i18n/dictionaries";
 import { getShippingSettings, qualifiesForFreeShipping } from "@/lib/shipping";
+import { vatTreatmentFor } from "@/lib/vat";
 
 export default async function CartPage() {
   const [{ items, subtotalCents }, user, { locale, t }, shipping] = await Promise.all([
@@ -21,6 +22,7 @@ export default async function CartPage() {
   ]);
   const threshold = shipping.freeShippingThresholdCents;
   const freeShipping = qualifiesForFreeShipping(subtotalCents, shipping);
+  const reverseCharge = user?.company ? vatTreatmentFor(user.company) === "reverse_charge" : false;
   const c = t.cart;
 
   const companyApproved = user?.company?.status === "approved";
@@ -147,6 +149,7 @@ export default async function CartPage() {
 
               <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
                 {freeShipping ? null : c.shippingNote}
+                {reverseCharge && <span className="mt-1 block">{c.vatReverseNote}</span>}
               </p>
 
               <div className="mt-5">

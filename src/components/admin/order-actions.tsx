@@ -17,10 +17,12 @@ import { Ban, CheckCircle2, FileText, Loader2, Send } from "lucide-react";
 export function InvoiceForm({
   orderId,
   freeShipping,
+  vatPreview,
 }: {
   orderId: string;
   /** Placed above the free-shipping threshold: shipping is prefilled at 0. */
   freeShipping: boolean;
+  vatPreview: { text: string; warning: boolean };
 }) {
   const [isPending, startTransition] = useTransition();
 
@@ -40,6 +42,15 @@ export function InvoiceForm({
       </h3>
       <p className="mt-1 text-xs text-muted-foreground">
         Het factuurnummer en de btw worden automatisch toegevoegd.
+      </p>
+      <p
+        className={`mt-3 rounded-md px-3 py-2 text-xs ${
+          vatPreview.warning
+            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+            : "bg-muted text-muted-foreground"
+        }`}
+      >
+        {vatPreview.text}
       </p>
       <form action={handleSubmit} className="mt-4 space-y-4">
         <div className="space-y-2">

@@ -7,6 +7,7 @@ import { formatDate, formatPriceCents } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { InvoiceForm, OrderStatusActions } from "@/components/admin/order-actions";
+import { countryName, isEuCountry, SELLER_COUNTRY, vatTreatmentFor } from "@/lib/vat";
 import { ArrowLeft, Building2, ExternalLink, FileText, Receipt, Truck } from "lucide-react";
 
 const statusLabels: Record<string, string> = {
@@ -22,6 +23,27 @@ const companyStatusLabels: Record<string, string> = {
   pending: "In beoordeling",
   suspended: "Opgeschort",
 };
+
+/** Which VAT the invoice will get, so there are no surprises when it is issued. */
+function vatPreview(c: {
+  country: string;
+  vatNumber: string | null;
+  vatStatus: string;
+  addressLine: string | null;
+}): { text: string; warning: boolean } {
+  if (!c.addressLine) {
+    return { text: "Adres van dit bedrijf ontbreekt — vul het eerst in bij Zakelijke accounts.", warning: true };
+  }
+  if (!isEuCountry(c.country) || c.country === SELLER_COUNTRY) {
+    return { text: "Normaal btw-tarief (klant in Nederland).", warning: false };
+  }
+  if (vatTreatmentFor(c) === "reverse_charge") {
+    return { text: `Btw verlegd (0%) — ${countryName(c.country)}, btw-nummer geldig in VIES.`, warning: false };
+  }
+  return c.vatNumber
+    ? { text: `Klant in ${countryName(c.country)}; btw-nummer wordt bij het aanmaken in VIES gecontroleerd. Geldig → 0% verlegd, anders normaal tarief.`, warning: false }
+    : { text: `Klant in ${countryName(c.country)} zonder btw-nummer: normaal btw-tarief.`, warning: true };
+}
 
 export default async function AdminOrderDetailPage({
   params,
@@ -215,7 +237,11 @@ export default async function AdminOrderDetailPage({
           </section>
 
           {order.status === "placed" ? (
-            <InvoiceForm orderId={order.id} freeShipping={order.shippingCents === 0} />
+            <InvoiceForm
+              orderId={order.id}
+              freeShipping={order.shippingCents === 0}
+              vatPreview={vatPreview(order.company)}
+            />
           ) : (
             <section className="rounded-xl border border-border p-5">
               <h3 className="flex items-center gap-2 text-sm font-semibold">

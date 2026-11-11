@@ -50,6 +50,17 @@ export const companies = pgTable("companies", {
   kvkNumber: text("kvk_number"),
   vatNumber: text("vat_number"),
   billingEmail: text("billing_email"),
+  // Billing address — required on an invoice, and the country decides VAT.
+  addressLine: text("address_line"),
+  postalCode: text("postal_code"),
+  city: text("city"),
+  /** ISO 3166-1 alpha-2, e.g. "NL", "DE". */
+  country: text("country").notNull().default("NL"),
+  /** Result of the last VIES check of vatNumber: unverified | valid | invalid. */
+  vatStatus: text("vat_status").notNull().default("unverified"),
+  vatCheckedAt: timestamp("vat_checked_at", { withTimezone: true }),
+  /** Company name as registered in VIES, to compare with what they typed. */
+  vatRegisteredName: text("vat_registered_name"),
   status: companyStatusEnum("status").notNull().default("pending"),
   joinCode: text("join_code").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -306,6 +317,10 @@ export const orders = pgTable("orders", {
   // The seller's name, address and fiscal identifiers exactly as they stood
   // when the invoice was issued. Read live, a later address or bank change
   // would silently rewrite every invoice ever sent.
+  /** domestic | reverse_charge — fixed when the invoice is issued. */
+  vatTreatment: text("vat_treatment"),
+  /** Buyer name/address/VAT number as on the invoice, frozen like the seller. */
+  buyerSnapshot: jsonb("buyer_snapshot"),
   sellerSnapshot: jsonb("seller_snapshot").$type<Record<string, unknown>>(),
   invoiceNumber: text("invoice_number"),
   invoiceNotes: text("invoice_notes"),
