@@ -23,7 +23,7 @@ type CartItem = {
     nameNl: string | null;
     nameDe?: string | null;
     nameFr?: string | null;
-    imageUrl: string | null;
+    hasImage: boolean;
     unit: string;
     priceCents: number;
     currency: string;
@@ -57,10 +57,10 @@ export function CartItemRow({ item }: { item: CartItem }) {
         href={`/products/${item.product.id}`}
         className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-border bg-white p-2"
       >
-        {item.product.imageUrl ? (
+        {item.product.hasImage ? (
           // eslint-disable-next-line @next/next/no-img-element -- supplier image domains are dynamic
           <img
-            src={item.product.imageUrl}
+            src={`/img/${item.product.id}`}
             alt=""
             className="h-full w-full object-contain"
           />

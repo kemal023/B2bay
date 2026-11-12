@@ -50,7 +50,7 @@ export async function generateMetadata({
       title: name,
       description: summary,
       type: "website",
-      ...(product.imageUrl ? { images: [{ url: product.imageUrl }] } : {}),
+      ...(product.imageUrl ? { images: [{ url: `/img/${product.id}` }] } : {}),
     },
   };
 }
@@ -156,7 +156,7 @@ export default async function ProductDetailPage({
             <div className="aspect-square">
               {product.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element -- supplier image domains are dynamic and admin-managed
-                <img src={product.imageUrl} alt={name} className="h-full w-full object-contain" />
+                <img src={`/img/${product.id}`} alt={name} className="h-full w-full object-contain" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-zinc-300">
                   <ImageOff className="h-16 w-16" />

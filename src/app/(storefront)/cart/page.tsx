@@ -100,7 +100,28 @@ export default async function CartPage() {
         <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_360px]">
           <div className="space-y-3">
             {items.map((item) => (
-              <CartItemRow key={item.id} item={item} />
+              <CartItemRow
+                key={item.id}
+                // Only what the row shows: this is serialized into the page, and the full
+                // product row would hand the browser cost prices and supplier details.
+                item={{
+                  id: item.id,
+                  quantity: item.quantity,
+                  unitPriceCents: item.unitPriceCents,
+                  product: {
+                    id: item.product.id,
+                    name: item.product.name,
+                    nameNl: item.product.nameNl,
+                    nameDe: item.product.nameDe,
+                    nameFr: item.product.nameFr,
+                    hasImage: Boolean(item.product.imageUrl),
+                    unit: item.product.unit,
+                    priceCents: item.product.priceCents,
+                    currency: item.product.currency,
+                    minOrderQty: item.product.minOrderQty,
+                  },
+                }}
+              />
             ))}
             <div className="pt-2">
               <Button asChild variant="outline" size="sm">

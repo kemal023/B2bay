@@ -4,7 +4,7 @@ import { formatPriceCents } from "@/lib/format";
 import type { PriceAccess } from "@/lib/price-visibility";
 import type { Locale } from "@/lib/i18n/config";
 import { dictionaries, fmt } from "@/lib/i18n/dictionaries";
-import { localizedName, localizedUnit, shopCategoryLabel } from "@/lib/product-text";
+import { localizedName, localizedUnit, productImageSrc, shopCategoryLabel } from "@/lib/product-text";
 
 export type ProductCardProduct = {
   id: string;
@@ -55,7 +55,7 @@ export function ProductCard({
         {product.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- supplier image domains are dynamic and admin-managed
           <img
-            src={product.imageUrl}
+            src={productImageSrc(product)!}
             alt={name}
             loading="lazy"
             className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"

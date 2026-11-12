@@ -110,3 +110,11 @@ export function localizedUnit(unit: string, locale: Locale): string {
   const key = UNIT_ALIASES[unit.trim().toLowerCase()];
   return key ? UNITS[key][locale] : unit;
 }
+
+/**
+ * Where the browser loads a product photo: always via the shop's own
+ * /img route (src/app/img/[id]/route.ts), never the supplier's URL.
+ */
+export function productImageSrc(p: { id: string; imageUrl: string | null }): string | null {
+  return p.imageUrl ? `/img/${p.id}` : null;
+}

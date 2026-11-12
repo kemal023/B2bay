@@ -24,6 +24,7 @@ import { getDictionary } from "@/lib/i18n/server";
 import { intlLocale } from "@/lib/i18n/config";
 import { fmt, plural } from "@/lib/i18n/dictionaries";
 import { mainLabel, subLabel } from "@/lib/taxonomy.mjs";
+import { productImageSrc } from "@/lib/product-text";
 
 const FEATURED_CATEGORY_COUNT = 13;
 
@@ -106,7 +107,7 @@ export default async function HomePage() {
                     <div className="aspect-square">
                       {/* eslint-disable-next-line @next/next/no-img-element -- supplier image domains are dynamic */}
                       <img
-                        src={p.imageUrl ?? ""}
+                        src={productImageSrc(p) ?? ""}
                         alt=""
                         className="h-full w-full object-contain"
                       />
