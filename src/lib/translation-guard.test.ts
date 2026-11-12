@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  expandPolishAbbreviations,
   inchesKept,
   isLikelyPolish,
+  polishWordCount,
   protectForForeign,
   rejectReason,
   restoreTerms,
@@ -64,5 +66,17 @@ describe("names into German and French", () => {
     expect(rejectReason("Switch 12V amio-03839", "Interrupteur 12V ami-03839", { glossary: false })).toBe(
       "code-kwijt:amio-03839",
     );
+  });
+});
+
+describe("Polish names", () => {
+  it("writes out Annapol abbreviations, also when glued to a number", () => {
+    expect(expandPolishAbbreviations('Rękawice nitr. gran.-czarne, 12szt.')).toBe("Rękawice nitrylowe granatowe-czarne, 12 sztuk");
+    expect(expandPolishAbbreviations("Komplet")).toBe("Komplet");
+  });
+
+  it("does not take brands and trade terms for Polish", () => {
+    expect(isLikelyPolish("Philips bulb INOX housing, PCV cable")).toBe(false);
+    expect(polishWordCount("Gloves nitr. gran.-czarne")).toBeGreaterThan(polishWordCount("Gloves nitrile navy-black"));
   });
 });

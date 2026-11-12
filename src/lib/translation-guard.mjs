@@ -122,7 +122,74 @@ const POLISH_PREFIXES = [
 ];
 // Generated words that are also legitimate English (or trade) terms in this
 // catalogue; flagging them would keep perfectly good names untranslated.
-const NOT_POLISH = new Set(["canbus", "pendrive", "pod", "ram"]);
+// The second line came from a review of names stuck as "still Polish": brands,
+// trade terms and English that happen to be in the generated list. Each of
+// them kept a correct English name from being translated into Dutch.
+const NOT_POLISH = new Set([
+  "canbus", "pendrive", "pod", "ram",
+  "alu", "anti", "clogg", "ekg", "etui", "extrem", "hebel", "inox", "juco", "kel", "manicure",
+  "pcv", "philips", "prof", "sat", "tor", "tstak", "vzw", "xrca", "xusb",
+]);
+
+/**
+ * Abbreviations in Annapol's Polish names that the translator can't read
+ * ("Rękawice nitr. gran.-czarne" came back as "Gloves nitr. gran.-black").
+ * Written out in Polish before translating. Built from the most frequent
+ * leftovers in the catalogue; only abbreviations with one clear meaning.
+ */
+const POLISH_ABBREVIATIONS = [
+  ["antyelektrost.", "antyelektrostatyczne"],
+  ["blist.", "blister"],
+  ["czar-szar-turk.", "czarno-szaro-turkusowe"],
+  ["elektrotechn.", "elektrotechniczne"],
+  ["gran.", "granatowe"],
+  ["kpl.", "komplet"],
+  ["kpl", "komplet"],
+  ["lut.", "lutownicze"],
+  ["nieb.", "niebieskie"],
+  ["nitr.", "nitrylowe"],
+  ["ociep.", "ocieplane"],
+  ["odblask.", "odblaskowe"],
+  ["odgięt.", "odgięte"],
+  ["plast.", "plastikowe"],
+  ["półokr.", "półokrągłe"],
+  ["pom.", "pomarańczowe"],
+  ["prof.", "profesjonalne"],
+  ["szt.", "sztuk"],
+  ["szt", "sztuk"],
+  ["telefon.", "telefoniczny"],
+  ["trz.", "trzonek"],
+  ["warszt.", "warsztatowe"],
+  ["wzmoc.", "wzmocnieniem"],
+];
+const abbreviationPatterns = POLISH_ABBREVIATIONS.map(([short, full]) => ({
+  // Not inside a longer word; "szt" may be glued to a number ("12szt").
+  pattern: new RegExp(`(?<![a-ząćęłńóśźż])${escapeRegExp(short)}(?![a-ząćęłńóśźż])`, "giu"),
+  full,
+}));
+
+/** Writes out known Polish abbreviations ("nitr." -> "nitrylowe") before translating. */
+export function expandPolishAbbreviations(text) {
+  // "12szt" -> "12 sztuk": glued to a number it would look like a product code.
+  return abbreviationPatterns.reduce(
+    (acc, { pattern, full }) =>
+      acc.replace(pattern, (_m, offset, whole) => (/\d/.test(whole[offset - 1] ?? "") ? " " : "") + full),
+    text,
+  );
+}
+
+/** How many words look Polish; for picking the least Polish of several attempts. */
+export function polishWordCount(text) {
+  if (POLISH_DIACRITICS.test(text) && words(text).length === 0) return 1;
+  return words(text).filter(
+    (w) =>
+      !NOT_POLISH.has(w) &&
+      (/[ąćęłńśźż]/.test(w) ||
+        POLISH_WORDS.has(w) ||
+        POLISH_VOCABULARY.has(w) ||
+        POLISH_PREFIXES.some((p) => w.startsWith(p))),
+  ).length;
+}
 const POLISH_DIACRITICS = /[ąćęłńśźżĄĆĘŁŃŚŹŻ]/;
 
 // Distinctive enough that the translator leaves it alone. Short ones such as

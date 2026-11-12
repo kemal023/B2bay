@@ -13,9 +13,23 @@ const displayName = (locale: Locale) => {
   return translated ? sql`coalesce(${translated}, ${products.name})` : sql`${products.name}`;
 };
 
+/**
+ * "Most relevant" while browsing (no search): ordering by stock put the
+ * biggest piles first — batteries and connectors at €0.03 — so the catalogue
+ * opened with its least interesting products. Now: products with a photo, in
+ * stock and in a normal price range (€2–€500) first, mixed across categories
+ * by a shuffle that changes daily but stays put while paging within a day.
+ */
+const showcaseOrder = [
+  desc(sql`${products.imageUrl} is not null`),
+  desc(sql`${products.stockQty} > 0`),
+  desc(sql`${products.priceCents} between 200 and 50000`),
+  asc(sql`md5(${products.id}::text || current_date::text)`),
+];
+
 // Labels live in the dictionaries (catalog.sortOptions).
 export const SORT_OPTIONS = {
-  relevant: { orderBy: (l: Locale) => [desc(products.stockQty), asc(displayName(l))] },
+  relevant: { orderBy: () => showcaseOrder },
   "price-asc": { orderBy: () => [asc(products.priceCents)] },
   "price-desc": { orderBy: () => [desc(products.priceCents)] },
   name: { orderBy: (l: Locale) => [asc(displayName(l))] },

@@ -25,8 +25,10 @@
  */
 import { neon } from "@neondatabase/serverless";
 import {
+  expandPolishAbbreviations,
   inchesKept,
   isLikelyPolish,
+  polishWordCount,
   protectForForeign,
   protectTerms,
   rejectReason,
@@ -90,8 +92,11 @@ async function detect(text) {
 /**
  * Translates distinct strings with caching and the guardrails. Returns a Map
  * of accepted translations only; callers decide the fallback.
+ *
+ * allowPolish: also accept a pl -> en result with a Polish word left in;
+ * the caller then compares it with the alternatives (names only).
  */
-async function translateTexts(texts, from, to) {
+async function translateTexts(texts, from, to, { allowPolish = false } = {}) {
   const unique = [...new Set(texts.filter((t) => t && t.trim()))];
   const result = new Map();
   if (unique.length === 0 || from === to) return result;
@@ -101,7 +106,7 @@ async function translateTexts(texts, from, to) {
   const guard = { glossary: to === "nl" && from === "en", minRatio: toEnglish ? 0.45 : 0.6 };
   const accept = (src, out) =>
     rejectReason(src, out, guard) === null &&
-    !(from === "pl" && isLikelyPolish(out)) &&
+    !(from === "pl" && !allowPolish && isLikelyPolish(out)) &&
     (!foreign || inchesKept(src, out));
 
   const cached = await sql.query(
@@ -182,6 +187,35 @@ async function assignLanguages() {
 // Names
 // ---------------------------------------------------------------------------
 
+/**
+ * Polish names into English. Annapol abbreviates heavily ("Rękawice nitr.
+ * gran.-czarne"), and a translation with one such word left in used to be
+ * thrown away, leaving the far more Polish original on the site. Now the
+ * name is tried as is and with the abbreviations written out, and the least
+ * Polish of those and the current name wins (the current name wins ties).
+ * The other checks (codes, numbers, length) still apply to every attempt.
+ */
+async function polishNamesToEnglish(group) {
+  const sources = group.map((p) => p.source);
+  const expanded = new Map(sources.map((s) => [s, expandPolishAbbreviations(s)]));
+  const plain = await translateTexts(sources, "pl", "en", { allowPolish: true });
+  const changed = [...expanded].filter(([s, e]) => s !== e).map(([, e]) => e);
+  const written = await translateTexts(changed, "pl", "en", { allowPolish: true });
+
+  for (const p of group) {
+    // The current name first: a fresh attempt must be strictly less Polish to
+    // replace it, because on equal footing the earlier one was often better
+    // ("Chopper" became "Splitter", "Tape measure" "Curved measurement").
+    const candidates = [p.name, written.get(expanded.get(p.source)), plain.get(p.source)].filter(Boolean);
+    let best = candidates[0];
+    for (const c of candidates) {
+      // ...and must not get there by dropping words ("Poziomnica stand…" lost the "spirit level").
+      if (polishWordCount(c) < polishWordCount(best) && c.length >= best.length * 0.8) best = c;
+    }
+    p.en = best;
+  }
+}
+
 async function translateNames() {
   const rows = await sql.query(`
     SELECT p.id, p.name, p.source_name, p.source_lang, p.customized FROM products p
@@ -211,6 +245,10 @@ async function translateNames() {
   // Source -> English, grouped per language.
   for (const lang of new Set(plans.filter((p) => p.en === null).map((p) => p.lang))) {
     const group = plans.filter((p) => p.en === null && p.lang === lang);
+    if (lang === "pl") {
+      await polishNamesToEnglish(group);
+      continue;
+    }
     const done = await translateTexts(group.map((p) => p.source), lang, "en");
     for (const p of group) {
       // Untrustworthy translation: keep what we had rather than nothing.
