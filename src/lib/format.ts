@@ -15,6 +15,6 @@ export function formatDate(date: Date | string, locale: Locale = "nl"): string {
 }
 
 /** Date without a time — invoice, due and payment dates are whole days. */
-export function formatDateOnly(date: Date | string): string {
-  return new Intl.DateTimeFormat("nl-NL", { dateStyle: "long" }).format(new Date(date));
+export function formatDateOnly(date: Date | string, locale: Locale = "nl"): string {
+  return new Intl.DateTimeFormat(intlLocale(locale), { dateStyle: "long" }).format(new Date(date));
 }

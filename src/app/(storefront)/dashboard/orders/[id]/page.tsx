@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { orders } from "@/db/schema";
 import { getAppUserWithCompany } from "@/lib/auth";
-import { formatDate, formatPriceCents } from "@/lib/format";
+import { formatDate, formatDateOnly, formatPriceCents } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -136,7 +136,7 @@ export default async function OrderDetailPage({
               <p className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
                 {fmt(o.payInstruction, {
                   amount: formatPriceCents(order.totalCents, order.currency),
-                  date: formatDate(invoiceDueDate(order.invoicedAt, seller.paymentTermDays), locale),
+                  date: formatDateOnly(invoiceDueDate(order.invoicedAt, seller.paymentTermDays), locale),
                   iban: seller.iban,
                   name: seller.legalName,
                   reference: paymentReference(order.invoiceNumber),
