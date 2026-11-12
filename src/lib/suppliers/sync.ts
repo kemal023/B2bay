@@ -3,6 +3,8 @@ import { getDb } from "@/db";
 import { products, suppliers } from "@/db/schema";
 import { getSupplierAdapter } from "./registry";
 import type { NormalizedProduct, SupplierRow } from "./types";
+import { scrubSupplierTraces } from "@/lib/supplier-scrub.mjs";
+import { takesOverListing } from "./offer-choice";
 
 export type SyncResult = {
   supplierId: string;
@@ -10,6 +12,8 @@ export type SyncResult = {
   ok: boolean;
   productsUpserted: number;
   productsDeactivated: number;
+  /** In this feed, but listed with another supplier that sells them cheaper (same EAN). */
+  productsCheaperElsewhere: number;
   /** Sync succeeded but something needs a look, e.g. deactivation was skipped. */
   warning?: string;
   error?: string;
@@ -40,7 +44,9 @@ const COMMON_COLUMNS =
 // marker (*_tr_hash) cleared, so scripts/translate-catalog.mjs redoes it.
 // An unchanged source leaves an existing translation alone.
 function commonValues(item: NormalizedProduct, markupPercent: number) {
-  const description = item.description ?? null;
+  // Customers must not see who supplies or makes the goods (lib/supplier-scrub.mjs).
+  const description = item.description ? scrubSupplierTraces(item.description) : null;
+  item = { ...item, name: scrubSupplierTraces(item.name) || item.name };
   const category = item.category ?? null;
   const path = (item.categoryPath ?? (category ? [category] : [])).join(" > ") || null;
   return sql`${item.ean ?? null}::text, ${item.name}::text, ${item.name}::text, ${description}::text, ${description}::text, ${item.imageUrl ?? null}::text, ${category}::text, ${category}::text, ${path}::text, ${item.unit ?? "stuk"}::text, ${item.costPriceCents}::integer, ${sellPriceFromCost(item.costPriceCents, markupPercent)}::integer, ${item.currency ?? "EUR"}::text, ${item.stockQty}::integer, ${item.minOrderQty ?? 1}::integer`;
@@ -160,9 +166,9 @@ async function upsertBatch(
   supplierId: string,
   items: NormalizedProduct[],
   markupPercent: number,
-) {
+): Promise<number> {
   const bySkuFiltered = items.filter((i) => i.supplierSku);
-  if (bySkuFiltered.length === 0) return;
+  if (bySkuFiltered.length === 0) return 0;
 
   // Two different SKUs in this batch can share a brand-new EAN (not yet in
   // the DB either) — e.g. colour variants barcoded together. Without this,
@@ -206,7 +212,30 @@ async function upsertBatch(
     if (existingId) eanLinkedById.set(existingId, { id: existingId, item });
     else bySku.push(item);
   }
-  const eanLinked = [...eanLinkedById.values()];
+  // The same product (same EAN) from another supplier: one listing, bought
+  // where it's cheapest. This supplier only takes the listing over when the
+  // current one can't deliver it (inactive, or out of stock while this one
+  // has it) or when this one sells it for less and has it in stock. Equal
+  // prices leave it where it is, so the listing doesn't flip back and forth
+  // with every sync. Products the shop added by hand are never taken over.
+  const candidates = [...eanLinkedById.values()];
+  const current = candidates.length
+    ? await db
+        .select({
+          id: products.id,
+          supplierId: products.supplierId,
+          costPriceCents: products.costPriceCents,
+          stockQty: products.stockQty,
+          active: products.active,
+        })
+        .from(products)
+        .where(inArray(products.id, candidates.map((c) => c.id)))
+    : [];
+  const currentById = new Map(current.map((c) => [c.id, c]));
+  const eanLinked = candidates.filter(({ id, item }) => {
+    const cur = currentById.get(id);
+    return Boolean(cur) && takesOverListing(cur!, { supplierId, costPriceCents: item.costPriceCents, stockQty: item.stockQty });
+  });
 
   // An EAN-linked row is about to take over `item.supplierSku` as its new
   // identity. If an *older* row (from before this product was EAN-linked)
@@ -237,6 +266,7 @@ async function upsertBatch(
     relinkByEanBatch(db, supplierId, eanLinked, markupPercent),
     upsertBySkuBatch(db, supplierId, bySku, markupPercent),
   ]);
+  return candidates.length - eanLinked.length;
 }
 
 /** Fetches one supplier's catalog and bulk-upserts it into our own `products` table. */
@@ -258,9 +288,10 @@ export async function syncSupplier(supplier: SupplierRow): Promise<SyncResult> {
     const items = [...bySku.values()];
 
     let upserted = 0;
+    let cheaperElsewhere = 0;
     for (let i = 0; i < items.length; i += BATCH_SIZE) {
       const batch = items.slice(i, i + BATCH_SIZE);
-      await upsertBatch(db, supplier.id, batch, supplier.defaultMarkupPercent);
+      cheaperElsewhere += await upsertBatch(db, supplier.id, batch, supplier.defaultMarkupPercent);
       upserted += batch.length;
     }
 
@@ -313,8 +344,9 @@ export async function syncSupplier(supplier: SupplierRow): Promise<SyncResult> {
       supplierId: supplier.id,
       supplierName: supplier.name,
       ok: true,
-      productsUpserted: upserted,
+      productsUpserted: upserted - cheaperElsewhere,
       productsDeactivated: deactivated,
+      productsCheaperElsewhere: cheaperElsewhere,
       warning,
     };
   } catch (err) {
@@ -331,6 +363,7 @@ export async function syncSupplier(supplier: SupplierRow): Promise<SyncResult> {
       ok: false,
       productsUpserted: 0,
       productsDeactivated: 0,
+      productsCheaperElsewhere: 0,
       error: message,
     };
   }

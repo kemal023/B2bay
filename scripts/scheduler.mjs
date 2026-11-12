@@ -58,7 +58,7 @@ async function syncSuppliers() {
   if (results.length === 0) return;
   for (const r of results) {
     const line = r.ok
-      ? `${r.supplierName}: ${r.productsUpserted} bijgewerkt, ${r.productsDeactivated} gedeactiveerd${r.warning ? ` — LET OP: ${r.warning}` : ""}`
+      ? `${r.supplierName}: ${r.productsUpserted} bijgewerkt, ${r.productsDeactivated} gedeactiveerd${r.productsCheaperElsewhere ? `, ${r.productsCheaperElsewhere} goedkoper bij een andere leverancier` : ""}${r.warning ? ` — LET OP: ${r.warning}` : ""}`
       : `${r.supplierName}: MISLUKT — ${r.error}`;
     console.log(`${time()} sync ${line}`);
   }

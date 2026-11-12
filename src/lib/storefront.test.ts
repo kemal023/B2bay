@@ -138,3 +138,40 @@ describe("shop categories", () => {
     }
   });
 });
+
+describe("same product from two suppliers", () => {
+  const listing = { supplierId: "A", costPriceCents: 1000, stockQty: 5, active: true };
+  const offer = (cost: number, stock = 10) => ({ supplierId: "B", costPriceCents: cost, stockQty: stock });
+
+  it("moves to the cheaper supplier that has it in stock", async () => {
+    const { takesOverListing } = await import("@/lib/suppliers/offer-choice");
+    expect(takesOverListing(listing, offer(900))).toBe(true);
+    expect(takesOverListing(listing, offer(900, 0))).toBe(false); // cheaper but can't deliver
+    expect(takesOverListing(listing, offer(1000))).toBe(false); // a tie stays put
+    expect(takesOverListing(listing, offer(1100))).toBe(false);
+  });
+
+  it("takes over when the current supplier can't deliver", async () => {
+    const { takesOverListing } = await import("@/lib/suppliers/offer-choice");
+    expect(takesOverListing({ ...listing, stockQty: 0 }, offer(1500))).toBe(true);
+    expect(takesOverListing({ ...listing, active: false }, offer(1500, 0))).toBe(true);
+  });
+
+  it("never takes over the shop's own products", async () => {
+    const { takesOverListing } = await import("@/lib/suppliers/offer-choice");
+    expect(takesOverListing({ ...listing, supplierId: null }, offer(1))).toBe(false);
+  });
+});
+
+describe("supplier names in product texts", () => {
+  it("removes producer blocks but keeps the safety warnings", async () => {
+    const { scrubSupplierTraces } = await import("@/lib/supplier-scrub.mjs");
+    const text =
+      "Set includes a pump. PRODUCER: Maxy Sp. z o. o Gniewomierz 173 59-241 Legnickie Pole Poland www.maxy.eu office@maxy.eu RESPONSIBLE PERSON IN THE EU: Maxy WARNING CONTENT: - Wear a life jacket";
+    const out = scrubSupplierTraces(text);
+    expect(out).not.toMatch(/maxy|Gniewomierz/i);
+    expect(out).toContain("Set includes a pump.");
+    expect(out).toContain("WARNING CONTENT: - Wear a life jacket");
+    expect(scrubSupplierTraces("Fabrikant: Maxy; merk: Gardner")).toBe("merk: Gardner");
+  });
+});
