@@ -15,8 +15,7 @@ import {
   toggleFavorite,
   type BulkResult,
 } from "@/lib/actions/cart";
-import { CreditCard, Heart, Loader2, RotateCcw, ShoppingCart } from "lucide-react";
-import { payInvoice } from "@/lib/actions/orders";
+import { Heart, Loader2, RotateCcw, ShoppingCart } from "lucide-react";
 
 export function ReorderButton({ orderId }: { orderId: string }) {
   const { t } = useI18n();
@@ -145,23 +144,3 @@ export function AddFavoritesToCartButton() {
   );
 }
 
-export function PayInvoiceButton({ orderId }: { orderId: string }) {
-  const { t } = useI18n();
-  const [isPending, startTransition] = useTransition();
-  return (
-    <Button
-      disabled={isPending}
-      title={t.order.payMethods}
-      onClick={() =>
-        startTransition(async () => {
-          // Redirects to Mollie on success; only errors come back here.
-          const result = await payInvoice(orderId);
-          if (!result.ok) toast.error(result.error);
-        })
-      }
-    >
-      {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-      {t.order.payOnline}
-    </Button>
-  );
-}

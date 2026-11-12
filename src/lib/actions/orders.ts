@@ -7,7 +7,6 @@ import { cartItems, deliveryAddresses, orderItems, orders } from "@/db/schema";
 import { getDictionary } from "@/lib/i18n/server";
 import type { DeliverySnapshot } from "@/lib/delivery";
 import { getPricingContext, unitPriceCents } from "@/lib/pricing";
-import { createPayment, paymentsEnabled } from "@/lib/payments";
 import { getAppUserWithCompany } from "@/lib/auth";
 import { getShippingSettings, qualifiesForFreeShipping } from "@/lib/shipping";
 import { notifyNewOrder } from "@/lib/email/notify";
@@ -98,22 +97,3 @@ export async function placeOrder(deliveryAddressId?: string | null): Promise<Act
   redirect(`/dashboard/orders/${order.id}`);
 }
 
-/** Sends the customer to Mollie to pay an invoice of their own company. */
-export async function payInvoice(orderId: string): Promise<{ ok: false; error: string }> {
-  const user = await getAppUserWithCompany();
-  if (!user?.company) return { ok: false, error: "Geen bedrijfsaccount gekoppeld." };
-  if (!paymentsEnabled()) return { ok: false, error: "Online betalen is niet beschikbaar." };
-
-  const order = await getDb().query.orders.findFirst({
-    where: and(eq(orders.id, orderId), eq(orders.companyId, user.company.id)),
-  });
-  if (!order) return { ok: false, error: "Bestelling niet gevonden." };
-
-  let checkout: string;
-  try {
-    checkout = await createPayment(order.id);
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "Betalen lukt nu niet." };
-  }
-  redirect(checkout);
-}

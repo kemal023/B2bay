@@ -316,10 +316,6 @@ export const de: Dictionary = {
     awaitingBody:
       "Wir ermitteln die Versandkosten anhand Ihrer Bestellung und senden Ihnen in Kürze eine Rechnung zur Zahlung per Überweisung.",
     creditNotes: "Gutschriften",
-    payOnline: "Jetzt online bezahlen",
-    payMethods: "iDEAL, Bancontact oder Kreditkarte",
-    paymentReceived: "Zahlung erhalten — vielen Dank!",
-    paymentPending: "Ihre Zahlung wurde nicht abgeschlossen. Bitte versuchen Sie es erneut oder zahlen Sie per Überweisung.",
     paid: "Bezahlt am {date}",
     invoiceTitle: "Rechnung {number}",
     invoiceBody: "Sehen Sie Ihre Rechnung ein oder laden Sie sie herunter und überweisen Sie den Gesamtbetrag.",

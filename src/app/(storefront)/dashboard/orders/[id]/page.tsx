@@ -16,17 +16,14 @@ import { deliveryFor } from "@/lib/delivery";
 import { AddressBlock } from "@/components/address-block";
 import { getDictionary } from "@/lib/i18n/server";
 import { fmt, plural } from "@/lib/i18n/dictionaries";
-import { PayInvoiceButton, ReorderButton } from "@/components/bulk-cart-actions";
-import { paymentsEnabled, syncPayment } from "@/lib/payments";
+import { ReorderButton } from "@/components/bulk-cart-actions";
 
 export default async function OrderDetailPage({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ payment?: string }>;
 }) {
-  const [{ id }, { payment }] = await Promise.all([params, searchParams]);
+  const { id } = await params;
   const user = await getAppUserWithCompany();
   if (!user) redirect("/sign-in");
   if (!user.company) redirect("/onboarding");
@@ -41,17 +38,6 @@ export default async function OrderDetailPage({
 
   if (!order || order.companyId !== user.company.id) notFound();
 
-  // Back from Mollie: check the payment right away (the webhook may not be
-  // able to reach this server) and reload the order if it changed.
-  let paymentStatus: string | null = null;
-  if (payment === "return" && order.paymentId && !order.paidAt && paymentsEnabled()) {
-    paymentStatus = await syncPayment(order.paymentId).catch(() => null);
-    if (paymentStatus === "paid") {
-      const fresh = await db.query.orders.findFirst({ where: eq(orders.id, id) });
-      if (fresh) Object.assign(order, { paidAt: fresh.paidAt, status: fresh.status });
-    }
-  }
-  const canPayOnline = paymentsEnabled() && Boolean(order.invoiceNumber) && !order.paidAt && order.status !== "cancelled";
   const delivery = deliveryFor({ deliveryAddress: order.deliveryAddress, company: user.company });
 
   return (
@@ -79,14 +65,6 @@ export default async function OrderDetailPage({
           {user.company?.status === "approved" && <ReorderButton orderId={order.id} />}
         </div>
       </div>
-
-      {payment === "return" && paymentStatus && (
-        <Alert className="mt-6" variant={paymentStatus === "paid" ? "default" : "destructive"}>
-          <AlertDescription>
-            {paymentStatus === "paid" ? o.paymentReceived : o.paymentPending}
-          </AlertDescription>
-        </Alert>
-      )}
 
       {order.status === "placed" && (
         <Alert className="mt-6">
@@ -138,8 +116,7 @@ export default async function OrderDetailPage({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {canPayOnline && <PayInvoiceButton orderId={order.id} />}
-            <Button asChild variant={canPayOnline ? "outline" : "default"}>
+            <Button asChild>
               <Link href={`/invoices/${order.id}`}>
                 {o.viewInvoice}
                 <Download className="h-4 w-4" />

@@ -316,10 +316,6 @@ export const fr: Dictionary = {
     awaitingBody:
       "Nous calculons les frais de port selon votre commande et vous enverrons sous peu une facture à régler par virement.",
     creditNotes: "Avoirs",
-    payOnline: "Payer en ligne",
-    payMethods: "iDEAL, Bancontact ou carte bancaire",
-    paymentReceived: "Paiement reçu — merci !",
-    paymentPending: "Votre paiement n'a pas abouti. Réessayez ou payez par virement.",
     paid: "Payée le {date}",
     invoiceTitle: "Facture {number}",
     invoiceBody: "Consultez ou téléchargez votre facture et virez le montant total.",

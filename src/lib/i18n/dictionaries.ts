@@ -318,10 +318,6 @@ const nl = {
     awaitingBody:
       "We bepalen de verzendkosten op basis van je bestelling en sturen je binnenkort een factuur om per bank over te maken.",
     creditNotes: "Creditnota's",
-    payOnline: "Nu online betalen",
-    payMethods: "iDEAL, Bancontact of creditcard",
-    paymentReceived: "Betaling ontvangen — bedankt!",
-    paymentPending: "Je betaling is nog niet afgerond. Probeer het opnieuw of maak het bedrag over per bank.",
     paid: "Betaald op {date}",
     invoiceTitle: "Factuur {number}",
     invoiceBody: "Bekijk of download je factuur en maak het totaalbedrag over.",
@@ -716,10 +712,6 @@ const en: Dictionary = {
     awaitingBody:
       "We determine the shipping costs based on your order and will shortly send you an invoice to pay by bank transfer.",
     creditNotes: "Credit notes",
-    payOnline: "Pay online now",
-    payMethods: "iDEAL, Bancontact or credit card",
-    paymentReceived: "Payment received — thank you!",
-    paymentPending: "Your payment has not been completed. Please try again or pay by bank transfer.",
     paid: "Paid on {date}",
     invoiceTitle: "Invoice {number}",
     invoiceBody: "View or download your invoice and transfer the total amount.",

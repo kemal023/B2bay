@@ -386,8 +386,6 @@ export const orders = pgTable("orders", {
   // would silently rewrite every invoice ever sent.
   /** Where to deliver, frozen at order time; null = the billing address. */
   deliveryAddress: jsonb("delivery_address"),
-  /** Latest online payment attempt (Mollie payment id, tr_...). */
-  paymentId: text("payment_id"),
   // Shipment, filled in when the order is marked as shipped.
   carrier: text("carrier"),
   trackingCode: text("tracking_code"),
