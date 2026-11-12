@@ -210,7 +210,7 @@ export async function getCatalogStats() {
   const rows = await db.execute<{ products: number; categories: number; in_stock: number }>(sql`
     SELECT
       COUNT(*)::int AS products,
-      COUNT(DISTINCT main_category)::int AS categories,
+      COUNT(DISTINCT main_category) FILTER (WHERE main_category <> 'other')::int AS categories,
       COUNT(*) FILTER (WHERE stock_qty > 0)::int AS in_stock
     FROM products
     WHERE active = true AND stock_qty >= ${minStockQty}

@@ -257,9 +257,9 @@ export const de: Dictionary = {
       "Bei Lieferung außerhalb der Niederlande erhält Ihre Rechnung 0% MwSt. (Reverse Charge): Ihr Unternehmen hat eine gültige EU-USt-IdNr.",
     freeShippingReached: "Ihre Bestellung liegt über {amount} und wird kostenlos versandt.",
     freeShippingRemaining: "Noch {amount} bis zum kostenlosen Versand (ab {threshold}).",
-    total: "Gesamt",
+    total: "Gesamt (zzgl. MwSt.)",
     shippingNote:
-      "Die Versandkosten hängen von Ihrer Bestellung ab und werden von uns festgelegt. Sie erhalten eine Rechnung zur Zahlung per Überweisung.",
+      "MwSt. und Versandkosten kommen auf der Rechnung hinzu. Die Versandkosten hängen von Ihrer Bestellung ab; Sie zahlen die Rechnung per Überweisung.",
     placeOrder: "Bestellung aufgeben",
     remove: "Entfernen",
     unitLine: "{price} pro {unit} · min. {qty}",
@@ -318,6 +318,7 @@ export const de: Dictionary = {
       "Wir ermitteln die Versandkosten anhand Ihrer Bestellung und senden Ihnen in Kürze eine Rechnung zur Zahlung per Überweisung.",
     creditNotes: "Gutschriften",
     paid: "Bezahlt am {date}",
+    payInstruction: "Offener Betrag: {amount} bis {date} auf {iban}, Empfänger {name}, Verwendungszweck {reference}.",
     invoiceTitle: "Rechnung {number}",
     invoiceBody: "Sehen Sie Ihre Rechnung ein oder laden Sie sie herunter und überweisen Sie den Gesamtbetrag.",
     viewInvoice: "Rechnung ansehen",
@@ -327,7 +328,7 @@ export const de: Dictionary = {
     toBeDetermined: "Wird noch festgelegt",
     vat: "MwSt. {rate}%",
     vatReverseCharge: "Steuerschuldnerschaft des Leistungsempfängers (0%)",
-    total: "Gesamt",
+    total: "Gesamt (zzgl. MwSt.)",
     totalInclVat: "Gesamt inkl. MwSt.",
   },
   auth: {

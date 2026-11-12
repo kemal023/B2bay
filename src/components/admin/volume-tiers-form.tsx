@@ -30,6 +30,13 @@ export function VolumeTiersForm({ tiers }: { tiers: VolumeTier[] }) {
           Korting per orderregel vanaf een aantal stuks, voor alle klanten. Komt bovenop een
           prijsafspraak met een bedrijf. Laat regels leeg om ze uit te schakelen.
         </p>
+        <p
+          className={`mt-2 text-sm font-medium ${tiers.length ? "text-emerald-600 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}`}
+        >
+          {tiers.length
+            ? `Actief: ${tiers.map((t) => `${t.percent}% vanaf ${t.minQty} stuks`).join(" · ")}`
+            : "Nu geen staffelkorting actief."}
+        </p>
       </div>
 
       <div className="max-w-sm space-y-2">
@@ -44,7 +51,7 @@ export function VolumeTiersForm({ tiers }: { tiers: VolumeTier[] }) {
               type="number"
               min={2}
               step={1}
-              placeholder={["10", "50", "100", ""][i]}
+              placeholder="bv. 10"
               defaultValue={tiers[i]?.minQty ?? ""}
               aria-label={`Vanaf aantal, regel ${i + 1}`}
             />
@@ -54,7 +61,7 @@ export function VolumeTiersForm({ tiers }: { tiers: VolumeTier[] }) {
               min={0.1}
               max={99}
               step={0.1}
-              placeholder={["3", "5", "8", ""][i]}
+              placeholder="bv. 3"
               defaultValue={tiers[i]?.percent ?? ""}
               aria-label={`Korting, regel ${i + 1}`}
             />

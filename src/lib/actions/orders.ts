@@ -10,6 +10,7 @@ import { getPricingContext, unitPriceCents } from "@/lib/pricing";
 import { getAppUserWithCompany } from "@/lib/auth";
 import { getShippingSettings, qualifiesForFreeShipping } from "@/lib/shipping";
 import { notifyNewOrder } from "@/lib/email/notify";
+import { localizedName } from "@/lib/product-text";
 
 export type ActionResult = { ok: true; orderId: string } | { ok: false; error: string };
 
@@ -79,12 +80,15 @@ export async function placeOrder(deliveryAddressId?: string | null): Promise<Act
     })
     .returning();
 
+  // Line names in the language the customer ordered in: they end up on the
+  // invoice, which must not change afterwards.
+  const { locale } = await getDictionary();
   await db.insert(orderItems).values(
     priced.map((i) => ({
       orderId: order.id,
       productId: i.product.id,
       supplierId: i.product.supplierId,
-      nameSnapshot: i.product.name,
+      nameSnapshot: localizedName(i.product, locale),
       unitPriceCents: i.unitPriceCents,
       unitCostCents: i.product.costPriceCents,
       quantity: i.quantity,

@@ -17,6 +17,7 @@ import { AddressBlock } from "@/components/address-block";
 import { getDictionary } from "@/lib/i18n/server";
 import { fmt, plural } from "@/lib/i18n/dictionaries";
 import { ReorderButton } from "@/components/bulk-cart-actions";
+import { getCompanyDetails, invoiceDueDate, paymentReference } from "@/lib/invoicing";
 
 export default async function OrderDetailPage({
   params,
@@ -28,7 +29,7 @@ export default async function OrderDetailPage({
   if (!user) redirect("/sign-in");
   if (!user.company) redirect("/onboarding");
 
-  const { locale, t } = await getDictionary();
+  const [{ locale, t }, seller] = await Promise.all([getDictionary(), getCompanyDetails()]);
   const o = t.order;
   const db = getDb();
   const order = await db.query.orders.findFirst({
@@ -123,10 +124,25 @@ export default async function OrderDetailPage({
               </Link>
             </Button>
           </div>
-          {order.paidAt && (
+          {order.paidAt ? (
             <p className="w-full text-sm font-medium text-emerald-600 dark:text-emerald-400">
               {fmt(o.paid, { date: formatDate(order.paidAt, locale) })}
             </p>
+          ) : (
+            order.status !== "cancelled" &&
+            order.invoicedAt &&
+            order.totalCents != null &&
+            seller.iban && (
+              <p className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+                {fmt(o.payInstruction, {
+                  amount: formatPriceCents(order.totalCents, order.currency),
+                  date: formatDate(invoiceDueDate(order.invoicedAt, seller.paymentTermDays), locale),
+                  iban: seller.iban,
+                  name: seller.legalName,
+                  reference: paymentReference(order.invoiceNumber),
+                })}
+              </p>
+            )
           )}
         </div>
       )}

@@ -124,7 +124,11 @@ export default async function AdminOrderDetailPage({
             {itemCount === 1 ? "" : "en"}
           </p>
         </div>
-        <OrderStatusActions orderId={order.id} status={order.status} />
+        <OrderStatusActions
+          orderId={order.id}
+          status={order.status}
+          awaitingPayment={Boolean(order.invoiceNumber) && !order.paidAt && order.status !== "cancelled"}
+        />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">

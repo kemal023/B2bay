@@ -85,7 +85,16 @@ export function InvoiceForm({
   );
 }
 
-export function OrderStatusActions({ orderId, status }: { orderId: string; status: string }) {
+export function OrderStatusActions({
+  orderId,
+  status,
+  awaitingPayment,
+}: {
+  orderId: string;
+  status: string;
+  /** Invoiced and not paid yet — independent of shipping: B2B often pays after delivery. */
+  awaitingPayment: boolean;
+}) {
   const [isPending, startTransition] = useTransition();
 
   function run(action: (id: string) => Promise<{ ok: boolean; error?: string }>) {
@@ -98,7 +107,7 @@ export function OrderStatusActions({ orderId, status }: { orderId: string; statu
   return (
     <div className="flex flex-wrap items-center gap-2">
       {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-      {status === "invoiced" && (
+      {awaitingPayment && (
         <Button size="sm" onClick={() => run(markOrderPaid)} disabled={isPending}>
           <CheckCircle2 className="h-4 w-4" /> Markeer als betaald
         </Button>

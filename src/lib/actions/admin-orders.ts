@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { creditNotes, orders } from "@/db/schema";
 import { isPlatformAdmin } from "@/lib/auth";
@@ -147,7 +147,8 @@ export async function markOrderPaid(orderId: string): Promise<ActionResult> {
     const db = getDb();
     await db
       .update(orders)
-      .set({ status: "paid", paidAt: new Date() })
+      // Paid after shipping keeps "fulfilled" (shipped is further along); otherwise "paid".
+      .set({ status: sql`CASE WHEN ${orders.status} = 'fulfilled' THEN 'fulfilled'::order_status ELSE 'paid'::order_status END`, paidAt: new Date() })
       .where(eq(orders.id, orderId));
     revalidateOrder(orderId);
     return { ok: true };

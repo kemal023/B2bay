@@ -257,9 +257,9 @@ export const fr: Dictionary = {
       "Pour une livraison hors des Pays-Bas, votre facture sera à 0 % de TVA (autoliquidation) : votre entreprise a un numéro de TVA intracommunautaire valide.",
     freeShippingReached: "Votre commande dépasse {amount} et est livrée gratuitement.",
     freeShippingRemaining: "Encore {amount} pour la livraison gratuite (dès {threshold}).",
-    total: "Total",
+    total: "Total (HT)",
     shippingNote:
-      "Les frais de port dépendent de votre commande et sont fixés par nous. Vous recevrez une facture à régler par virement.",
+      "La TVA et les frais de port sont ajoutés sur la facture. Les frais de port dépendent de votre commande ; vous réglez la facture par virement.",
     placeOrder: "Passer la commande",
     remove: "Supprimer",
     unitLine: "{price} par {unit} · min. {qty}",
@@ -318,6 +318,7 @@ export const fr: Dictionary = {
       "Nous calculons les frais de port selon votre commande et vous enverrons sous peu une facture à régler par virement.",
     creditNotes: "Avoirs",
     paid: "Payée le {date}",
+    payInstruction: "Montant à régler : {amount} avant le {date} sur {iban} au nom de {name}, en indiquant {reference}.",
     invoiceTitle: "Facture {number}",
     invoiceBody: "Consultez ou téléchargez votre facture et virez le montant total.",
     viewInvoice: "Voir la facture",
@@ -327,7 +328,7 @@ export const fr: Dictionary = {
     toBeDetermined: "À déterminer",
     vat: "TVA {rate} %",
     vatReverseCharge: "Autoliquidation de la TVA (0 %)",
-    total: "Total",
+    total: "Total (HT)",
     totalInclVat: "Total TTC",
   },
   auth: {
