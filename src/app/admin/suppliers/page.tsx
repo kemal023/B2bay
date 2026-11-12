@@ -22,8 +22,12 @@ export default async function AdminSuppliersPage() {
       .select({
         supplierId: products.supplierId,
         count: sql<number>`count(*)::int`,
-        translated: sql<number>`count(*) filter (where ${products.nameTrHash} is not null and ${products.descTrHash} is not null)::int`,
-        translatedExtra: sql<number>`count(*) filter (where ${products.nameDe} is not null and ${products.nameFr} is not null)::int`,
+        // Names: every product has one. Descriptions: only count products that have a text at all.
+        withDesc: sql<number>`count(*) filter (where coalesce(${products.description}, '') <> '')::int`,
+        namesNlEn: sql<number>`count(*) filter (where ${products.nameTrHash} is not null)::int`,
+        descNlEn: sql<number>`count(*) filter (where coalesce(${products.description}, '') <> '' and ${products.descTrHash} is not null)::int`,
+        namesDeFr: sql<number>`count(*) filter (where ${products.nameDe} is not null and ${products.nameFr} is not null)::int`,
+        descDeFr: sql<number>`count(*) filter (where coalesce(${products.description}, '') <> '' and ${products.descriptionDe} is not null and ${products.descriptionFr} is not null)::int`,
       })
       .from(products)
       .where(eq(products.active, true))
@@ -92,9 +96,14 @@ export default async function AdminSuppliersPage() {
                       const st = statsBySupplier.get(s.id);
                       if (!st?.count) return null;
                       return (
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Vertaald: NL/EN {pct(st.translated, st.count)} · DE/FR {pct(st.translatedExtra, st.count)}
-                        </p>
+                        <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                          <p>
+                            NL/EN: namen {pct(st.namesNlEn, st.count)} · omschrijvingen {pct(st.descNlEn, st.withDesc)}
+                          </p>
+                          <p>
+                            DE/FR: namen {pct(st.namesDeFr, st.count)} · omschrijvingen {pct(st.descDeFr, st.withDesc)}
+                          </p>
+                        </div>
                       );
                     })()}
                   </TableCell>
