@@ -25,10 +25,14 @@
  */
 import { neon } from "@neondatabase/serverless";
 import {
+  inchesKept,
   isLikelyPolish,
+  protectForForeign,
   protectTerms,
   rejectReason,
   restoreTerms,
+  sentenceCase,
+  untranslatedWords,
 } from "../src/lib/translation-guard.mjs";
 
 const sql = neon(process.env.DATABASE_URL);
@@ -93,9 +97,12 @@ async function translateTexts(texts, from, to) {
   if (unique.length === 0 || from === to) return result;
 
   const toEnglish = to === "en";
+  const foreign = to === "de" || to === "fr";
   const guard = { glossary: to === "nl" && from === "en", minRatio: toEnglish ? 0.45 : 0.6 };
   const accept = (src, out) =>
-    rejectReason(src, out, guard) === null && !(from === "pl" && isLikelyPolish(out));
+    rejectReason(src, out, guard) === null &&
+    !(from === "pl" && isLikelyPolish(out)) &&
+    (!foreign || inchesKept(src, out));
 
   const cached = await sql.query(
     `SELECT source_text, translated_text FROM translations
@@ -119,7 +126,7 @@ async function translateTexts(texts, from, to) {
 
   // Pipe-separated names lose whole segments when sent as one string.
   const parts = missing.map((t) =>
-    t.split(" | ").map((s) => protectTerms(s, { glossary: guard.glossary })),
+    t.split(" | ").map((s) => (foreign ? protectForForeign(s) : protectTerms(s, { glossary: guard.glossary }))),
   );
   const raw = await callTranslate(parts.flat().map((p) => p.text), from, to);
 
@@ -381,20 +388,95 @@ async function translateDescriptions(priorityOnly) {
 
 const EXTRA_LANGS = ["de", "fr"];
 
-async function translateExtraNames(lang) {
+/**
+ * Bumped when the way names are put into German/French improves, so names
+ * done the old way are redone. Until a product's turn comes, its current
+ * translation stays on the site.
+ *   1: sentence-case retry for skipped words, inch sizes protected.
+ */
+const NAME_EXTRA_VERSION = 1;
+
+/** Restores the capitals of words that came through the lower-cased retry untranslated. */
+function restoreCase(source, text) {
+  let out = text;
+  for (const word of new Set(source.match(/\b[A-Z][a-z]{2,}\b/g) ?? [])) {
+    out = out.replace(new RegExp(`\\b${word.toLowerCase()}\\b`, "g"), word);
+  }
+  // The first real word keeps its capital ("DA185A porte cintre" -> "Porte").
+  const firstWord = (s) => s.split(/\s+/).findIndex((t) => /^\p{L}/u.test(t) && !/\d/.test(t));
+  const srcTokens = source.split(/\s+/);
+  const si = firstWord(source);
+  if (si >= 0 && /^\p{Lu}/u.test(srcTokens[si])) {
+    const tokens = out.split(" ");
+    const i = firstWord(out);
+    if (i >= 0) tokens[i] = tokens[i][0].toUpperCase() + tokens[i].slice(1);
+    out = tokens.join(" ");
+  }
+  return out;
+}
+
+/**
+ * English names into German or French. A name that comes back with English
+ * words left in is tried once more in sentence case; the attempt with the
+ * fewest untranslated words wins (a tie keeps the first).
+ */
+async function translateNamesForeign(names, lang) {
+  const first = await translateTexts(names, "en", lang);
+  const retry = new Map();
+  for (const name of names) {
+    const out = first.get(name);
+    if (out !== undefined && untranslatedWords(name, out) === 0) continue;
+    const variant = sentenceCase(name);
+    if (variant !== name) retry.set(name, variant);
+  }
+  const second = retry.size ? await translateTexts([...retry.values()], "en", lang) : new Map();
+
+  const result = new Map();
+  for (const name of names) {
+    const a = first.get(name);
+    const raw = retry.has(name) ? second.get(retry.get(name)) : undefined;
+    const b = raw === undefined ? undefined : restoreCase(name, raw);
+    // Fewer English words left only counts if nothing was dropped to get
+    // there ("Candy Set Desserts Ice Cream Cookies" lost half its words).
+    const better =
+      b !== undefined &&
+      (a === undefined ||
+        (untranslatedWords(name, b) < untranslatedWords(name, a) && b.length >= a.length * 0.85));
+    const best = better ? b : a;
+    if (best !== undefined) result.set(name, best);
+  }
+  return result;
+}
+
+async function translateExtraNames() {
+  const langs = EXTRA_LANGS.filter((l) => supported.has(l));
+  if (langs.length === 0) return 0;
   const rows = await sql.query(`
     SELECT p.id, p.name, p.customized FROM products p
-    WHERE p.name_tr_hash IS NOT NULL AND p.name_${lang} IS NULL
-    ORDER BY p.active DESC, (p.stock_qty > 0) DESC
+    WHERE p.name_tr_hash IS NOT NULL
+      AND (p.name_de IS NULL OR p.name_fr IS NULL OR p.name_extra_version < ${NAME_EXTRA_VERSION})
+    ORDER BY (p.name_de IS NULL OR p.name_fr IS NULL) DESC, p.active DESC, (p.stock_qty > 0) DESC
     LIMIT ${NAME_BATCH}`);
   if (rows.length === 0) return 0;
 
-  const translatable = rows.filter((r) => !r.customized && !isLikelyPolish(r.name));
-  const done = await translateTexts(translatable.map((r) => r.name), "en", lang);
+  const names = [...new Set(rows.filter((r) => !r.customized && !isLikelyPolish(r.name)).map((r) => r.name))];
+  const done = {};
+  for (const lang of langs) done[lang] = await translateNamesForeign(names, lang);
+  const pick = (lang, r) => done[lang]?.get(r.name) ?? r.name;
+
   await sql.query(
-    `UPDATE products p SET name_${lang} = x.t
-     FROM unnest($1::uuid[], $2::text[]) AS x(id, t) WHERE p.id = x.id`,
-    [rows.map((r) => r.id), rows.map((r) => done.get(r.name) ?? r.name)],
+    `UPDATE products p SET
+       name_de = CASE WHEN $4 THEN x.de ELSE p.name_de END,
+       name_fr = CASE WHEN $5 THEN x.fr ELSE p.name_fr END,
+       name_extra_version = ${NAME_EXTRA_VERSION}
+     FROM unnest($1::uuid[], $2::text[], $3::text[]) AS x(id, de, fr) WHERE p.id = x.id`,
+    [
+      rows.map((r) => r.id),
+      rows.map((r) => pick("de", r)),
+      rows.map((r) => pick("fr", r)),
+      langs.includes("de"),
+      langs.includes("fr"),
+    ],
   );
   return rows.length;
 }
@@ -456,9 +538,7 @@ async function extraStep(kind) {
   for (const lang of EXTRA_LANGS) {
     if (!supported.has(lang)) continue;
     const n =
-      kind === "names"
-        ? await translateExtraNames(lang)
-        : kind === "categories"
+      kind === "categories"
           ? await translateExtraCategories(lang)
           : await translateExtraDescriptions(lang);
     if (n) return n;
@@ -475,7 +555,7 @@ async function step() {
   n = await translateCategories();
   if (n) return (totals.categories += n), true;
   // Short German/French texts before the long English/Dutch backlog.
-  n = await extraStep("names");
+  n = await translateExtraNames();
   if (n) return (totals.names += n), true;
   n = await extraStep("categories");
   if (n) return (totals.categories += n), true;

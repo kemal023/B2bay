@@ -3,6 +3,7 @@ import {
   text,
   timestamp,
   integer,
+  smallint,
   boolean,
   pgEnum,
   uniqueIndex,
@@ -290,6 +291,9 @@ export const products = pgTable(
     nameTrHash: text("name_tr_hash"),
     descTrHash: text("desc_tr_hash"),
     catTrHash: text("cat_tr_hash"),
+    // Which version of the German/French name translation produced name_de /
+    // name_fr (NAME_EXTRA_VERSION in scripts/translate-catalog.mjs).
+    nameExtraVersion: smallint("name_extra_version").notNull().default(0),
     // Set when a visitor opens a product whose description is not translated
     // yet, so the translation service handles it before the backlog.
     translationPriority: timestamp("translation_priority", { withTimezone: true }),

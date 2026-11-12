@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { isLikelyPolish, rejectReason } from "@/lib/translation-guard.mjs";
+import {
+  inchesKept,
+  isLikelyPolish,
+  protectForForeign,
+  rejectReason,
+  restoreTerms,
+  sentenceCase,
+  untranslatedWords,
+} from "@/lib/translation-guard.mjs";
 
 describe("translation guard", () => {
   it("accepts a faithful translation", () => {
@@ -30,5 +38,31 @@ describe("translation guard", () => {
   it("recognises Polish", () => {
     expect(isLikelyPolish("Samoprzylepna taśma o właściwościach ochronnych")).toBe(true);
     expect(isLikelyPolish("Self-adhesive tape with protective properties")).toBe(false);
+  });
+});
+
+describe("names into German and French", () => {
+  it("lower-cases Title Case words but keeps brands, codes and the first word", () => {
+    expect(sentenceCase('ET101 Notebook Bag 15.6" Classic Esperanza')).toBe('ET101 Notebook bag 15.6" classic Esperanza');
+    expect(sentenceCase("Logic Game UFO Magic Capsule")).toBe("Logic game UFO magic capsule");
+  });
+
+  it("counts English words the translator skipped", () => {
+    expect(untranslatedWords("Axe Handle 600g", "Axe Handle 600g")).toBe(2);
+    expect(untranslatedWords("Axe Handle 600g", "Manche à hache 600g")).toBe(0);
+    expect(untranslatedWords("Tracer Money Box", "Tracer Geldbox")).toBe(0); // brand doesn't count
+  });
+
+  it("protects inch sizes", () => {
+    const p = protectForForeign('Notebook bag 15.6" and 3/4" socket');
+    expect(p.text).not.toContain('"');
+    expect(restoreTerms(p.text, p.originals)).toBe('Notebook bag 15.6" and 3/4" socket');
+    expect(inchesKept('Bag 15.6"', "Tasche 15.6")).toBe(false);
+  });
+
+  it("rejects a mangled item number", () => {
+    expect(rejectReason("Switch 12V amio-03839", "Interrupteur 12V ami-03839", { glossary: false })).toBe(
+      "code-kwijt:amio-03839",
+    );
   });
 });

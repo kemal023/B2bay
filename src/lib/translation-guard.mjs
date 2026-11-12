@@ -38,6 +38,7 @@ export const PROTECTED_TERMS = [
   "Maclean",
   "Malatec",
   "Proline",
+  "Psi Patrol",
   "Rebel",
   "Ruhhy",
   "Teesa",
@@ -220,6 +221,7 @@ export function restoreTerms(text, originals) {
 }
 
 const NUMBER = /\d+(?:[.,]\d+)?/g;
+const SKU = /(?<![a-z0-9])[a-z]{2,}-\d{3,}(?![0-9])/g;
 // "200pcs", "12V", "3x" — a number with a unit the translator may rewrite
 // ("200 st"); only the number itself has to survive.
 const NUMBER_WITH_UNIT = /^\d+(?:[.,]\d+)?[a-z]{1,4}$/;
@@ -288,10 +290,87 @@ export function rejectReason(source, translated, { glossary = true, minRatio = 0
     if (!dst.includes(code)) return `code-kwijt:${code}`;
   }
 
+  // Item numbers such as "amio-03839": the parts alone pass the checks above
+  // (a word and a number), but "ami-03839" is a different article.
+  for (const sku of src.match(SKU) ?? []) {
+    if (!dst.includes(sku)) return `code-kwijt:${sku}`;
+  }
+
   // Dutch runs as long as English or longer; a much shorter result means
   // words were dropped, a much longer one means the model started looping.
   if (out.length < source.length * minRatio) return "te-kort";
   if (out.length > source.length * 2.5) return "te-lang";
 
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Names into German and French
+//
+// LibreTranslate treats Title Case words as proper nouns and leaves them in
+// English ("Logic Game Puzzle UFO Magic Rotating Capsule Pink" came back
+// unchanged), while the same name in sentence case translates fine. Feeding
+// it the Polish original instead was tried and is worse: there is no direct
+// pl -> de/fr model, so it goes through English anyway and loses more.
+// ---------------------------------------------------------------------------
+
+const isProtectedWord = (w) => termPatterns.some(({ term }) => term.toLowerCase() === w.toLowerCase());
+
+/**
+ * Lower-cases Title Case words after the first one ("Notebook Bag Classic"
+ * -> "Notebook bag classic"). Brands, ALL CAPS and anything with digits keep
+ * their form; the first word stays capitalised for German nouns.
+ */
+export function sentenceCase(text) {
+  // Codes in front ("ET101", "75-613#") are not the first word.
+  let seenWord = false;
+  return text
+    .split(" ")
+    .map((token) => {
+      const word = token.replace(/[^A-Za-z'-]+$/, "");
+      const isWord = !/\d/.test(token) && /^[A-Za-z][A-Za-z'-]*$/.test(word);
+      if (!isWord) return token;
+      const first = !seenWord;
+      seenWord = true;
+      if (first || isProtectedWord(word) || !/^[A-Z][a-z]+(?:-[A-Za-z]+)*$/.test(word)) return token;
+      return word.toLowerCase() + token.slice(word.length);
+    })
+    .join(" ");
+}
+
+/**
+ * How many words of the English source came back unchanged — the sign of a
+ * word the translator skipped. Some are legitimately the same in German or
+ * French (Puzzle, Denim); this is for comparing two attempts, not a verdict.
+ */
+export function untranslatedWords(source, translated) {
+  const out = new Set(translated.toLowerCase().split(/[^a-zàâäçéèêëîïôöùûüÿœß]+/).filter(Boolean));
+  const seen = new Set();
+  let n = 0;
+  for (const word of source.split(/[^A-Za-z]+/)) {
+    if (word.length < 3 || /^[A-Z]+$/.test(word) || isProtectedWord(word)) continue;
+    const w = word.toLowerCase();
+    if (seen.has(w)) continue;
+    seen.add(w);
+    if (out.has(w)) n++;
+  }
+  return n;
+}
+
+// 15.6", 3/4", 1/2" — the translator tends to drop the inch mark.
+const INCHES = /(?<![\w.,/])\d+(?:[.,]\d+)?(?:\/\d+)?"/g;
+
+/** Like protectTerms, plus inch sizes; brands only, no glossary (en -> de/fr). */
+export function protectForForeign(text) {
+  const { text: shielded, originals } = protectTerms(text, { glossary: false });
+  const out = shielded.replace(INCHES, (found) => {
+    originals.push(found);
+    return placeholder(originals.length - 1);
+  });
+  return { text: out, originals };
+}
+
+/** Every inch size in the source is still there, mark included. */
+export function inchesKept(source, translated) {
+  return (source.match(INCHES) ?? []).every((size) => translated.includes(size));
 }
