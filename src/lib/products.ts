@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, gte, ilike, lte, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import { cache } from "react";
 import { getDb } from "@/db";
 import { products } from "@/db/schema";
 import { getCatalogRules, sellableConditions } from "@/lib/rules";
 import type { Locale } from "@/lib/i18n/config";
+import { OTHER, TAXONOMY } from "@/lib/taxonomy.mjs";
 
 export const PRODUCTS_PAGE_SIZE = 24;
 
@@ -44,7 +45,10 @@ export function isSortKey(value: string | undefined): value is SortKey {
 
 export type ListOptions = {
   q?: string;
-  category?: string;
+  /** Main category slug (src/lib/taxonomy.mjs). */
+  main?: string;
+  /** Subcategory slug; only applied together with its main category. */
+  sub?: string;
   page?: number;
   sort?: SortKey;
   locale?: Locale;
@@ -53,9 +57,22 @@ export type ListOptions = {
   maxPriceCents?: number;
 };
 
+const ALL_LOCALES = ["nl", "en", "de", "fr"] as const;
+
+/** Shop categories whose name (in any language) contains the word: "gereedschap" finds the tools. */
+function categoriesNamed(word: string) {
+  const w = word.toLowerCase();
+  const hit = (labels: Record<string, string>) => ALL_LOCALES.some((l) => labels[l].toLowerCase().includes(w));
+  return {
+    mains: TAXONOMY.filter((m) => hit(m.labels)).map((m) => m.slug),
+    subs: TAXONOMY.flatMap((m) => m.subs).filter((s) => hit(s.labels)).map((s) => s.slug),
+  };
+}
+
 /** A word that literally appears in the name, category, EAN or item number. */
 function exactWordMatch(word: string): SQL {
   const term = `%${word}%`;
+  const named = word.length >= 4 ? categoriesNamed(word) : { mains: [], subs: [] };
   // Both languages, so a Dutch search finds a product whose Dutch name
   // isn't ready yet, and an English one still works on the NL site.
   return or(
@@ -67,6 +84,8 @@ function exactWordMatch(word: string): SQL {
     ilike(products.categoryNl, term),
     ilike(products.ean, term),
     ilike(products.supplierSku, term),
+    named.mains.length ? inArray(products.mainCategory, named.mains) : undefined,
+    named.subs.length ? inArray(products.subCategory, named.subs) : undefined,
   )!;
 }
 
@@ -83,7 +102,10 @@ function relevance(q: string): SQL {
 export async function listProducts(opts: ListOptions = {}) {
   const db = getDb();
   const base = sellableConditions(await getCatalogRules());
-  if (opts.category) base.push(eq(products.category, opts.category));
+  if (opts.main) {
+    base.push(eq(products.mainCategory, opts.main));
+    if (opts.sub) base.push(eq(products.subCategory, opts.sub));
+  }
   if (opts.minPriceCents != null) base.push(gte(products.priceCents, opts.minPriceCents));
   if (opts.maxPriceCents != null) base.push(lte(products.priceCents, opts.maxPriceCents));
 
@@ -141,48 +163,45 @@ export const getProduct = cache(async (id: string) => {
   });
 });
 
-/** `category` is the stable key used in URLs; the others are its translated labels. */
-export type CategorySummary = {
-  category: string;
-  categoryNl: string | null;
-  categoryDe: string | null;
-  categoryFr: string | null;
+export type CategoryNode = {
+  /** Slug from src/lib/taxonomy.mjs; labels come from there too (mainLabel/subLabel). */
+  slug: string;
   productCount: number;
+  subs: { slug: string; productCount: number }[];
 };
 
 /**
- * Categories with their live product counts.
- *
- * "name" for a full list the customer scans to find one category; "size" when
- * only the first few are shown, since slicing an alphabetical list would
- * surface whatever starts with an A rather than what we actually sell most of.
+ * The shop's category tree with live product counts: main categories in
+ * their fixed order, each with the subcategories that have products.
+ * "Other" (products nothing could place) comes last, and only if non-empty.
  */
-export async function listCategorySummaries(
-  orderBy: "size" | "name" = "size",
-): Promise<CategorySummary[]> {
+export async function listCategoryTree(): Promise<CategoryNode[]> {
   const db = getDb();
   const { minStockQty } = await getCatalogRules();
-  const rows = await db.execute<{
-    category: string;
-    category_nl: string | null;
-    category_de: string | null;
-    category_fr: string | null;
-    n: number;
-  }>(sql`
-    SELECT category, MAX(category_nl) AS category_nl, MAX(category_de) AS category_de,
-           MAX(category_fr) AS category_fr, COUNT(*)::int AS n
+  const rows = await db.execute<{ main: string; sub: string | null; n: number }>(sql`
+    SELECT main_category AS main, sub_category AS sub, COUNT(*)::int AS n
     FROM products
-    WHERE active = true AND category IS NOT NULL AND stock_qty >= ${minStockQty}
-    GROUP BY category
-    ORDER BY ${orderBy === "name" ? sql`lower(category) ASC` : sql`n DESC`}
+    WHERE active = true AND main_category IS NOT NULL AND stock_qty >= ${minStockQty}
+    GROUP BY 1, 2
   `);
-  return rows.rows.map((r) => ({
-    category: r.category,
-    categoryNl: r.category_nl,
-    categoryDe: r.category_de,
-    categoryFr: r.category_fr,
-    productCount: Number(r.n),
-  }));
+  const counts = new Map<string, { total: number; subs: Map<string, number> }>();
+  for (const r of rows.rows) {
+    let c = counts.get(r.main);
+    if (!c) counts.set(r.main, (c = { total: 0, subs: new Map() }));
+    c.total += Number(r.n);
+    if (r.sub) c.subs.set(r.sub, Number(r.n));
+  }
+  const nodes: CategoryNode[] = TAXONOMY.filter((m) => counts.get(m.slug)?.total).map((m) => {
+    const c = counts.get(m.slug)!;
+    return {
+      slug: m.slug,
+      productCount: c.total,
+      subs: m.subs.filter((s) => c.subs.get(s.slug)).map((s) => ({ slug: s.slug, productCount: c.subs.get(s.slug)! })),
+    };
+  });
+  const other = counts.get(OTHER.slug);
+  if (other?.total) nodes.push({ slug: OTHER.slug, productCount: other.total, subs: [] });
+  return nodes;
 }
 
 export async function getCatalogStats() {
@@ -191,7 +210,7 @@ export async function getCatalogStats() {
   const rows = await db.execute<{ products: number; categories: number; in_stock: number }>(sql`
     SELECT
       COUNT(*)::int AS products,
-      COUNT(DISTINCT category)::int AS categories,
+      COUNT(DISTINCT main_category)::int AS categories,
       COUNT(*) FILTER (WHERE stock_qty > 0)::int AS in_stock
     FROM products
     WHERE active = true AND stock_qty >= ${minStockQty}
@@ -208,12 +227,10 @@ export type ShowcaseProduct = {
   id: string;
   name: string;
   nameNl: string | null;
-  category: string | null;
-  categoryNl: string | null;
   nameDe: string | null;
   nameFr: string | null;
-  categoryDe: string | null;
-  categoryFr: string | null;
+  mainCategory: string | null;
+  subCategory: string | null;
   imageUrl: string | null;
   priceCents: number;
   currency: string;
@@ -235,12 +252,10 @@ export async function listTopDeals(limit = 8): Promise<ShowcaseProduct[]> {
     id: string;
     name: string;
     name_nl: string | null;
-    category: string | null;
-    category_nl: string | null;
     name_de: string | null;
     name_fr: string | null;
-    category_de: string | null;
-    category_fr: string | null;
+    main_category: string | null;
+    sub_category: string | null;
     image_url: string | null;
     price_cents: number;
     currency: string;
@@ -257,15 +272,15 @@ export async function listTopDeals(limit = 8): Promise<ShowcaseProduct[]> {
       GROUP BY p.id
     ),
     per_category AS (
-      SELECT DISTINCT ON (p.category) p.id, p.stock_qty
+      SELECT DISTINCT ON (p.main_category) p.id, p.stock_qty
       FROM products p
       WHERE p.active = true
         AND p.image_url IS NOT NULL
-        AND p.category IS NOT NULL
+        AND p.main_category IS NOT NULL AND p.main_category <> 'other'
         AND p.stock_qty > 20
         AND p.stock_qty >= ${minStockQty}
         AND p.price_cents >= 500
-      ORDER BY p.category, p.stock_qty DESC
+      ORDER BY p.main_category, p.stock_qty DESC
     ),
     picked AS (
       SELECT id, 0 AS tier, sold AS score FROM best_sellers
@@ -273,8 +288,8 @@ export async function listTopDeals(limit = 8): Promise<ShowcaseProduct[]> {
       SELECT id, 1 AS tier, stock_qty AS score FROM per_category
       WHERE id NOT IN (SELECT id FROM best_sellers)
     )
-    SELECT p.id, p.name, p.name_nl, p.category, p.category_nl, p.name_de, p.name_fr,
-           p.category_de, p.category_fr, p.image_url, p.price_cents,
+    SELECT p.id, p.name, p.name_nl, p.name_de, p.name_fr,
+           p.main_category, p.sub_category, p.image_url, p.price_cents,
            p.currency, p.unit, p.min_order_qty, p.stock_qty
     FROM picked
     JOIN products p ON p.id = picked.id
@@ -286,12 +301,10 @@ export async function listTopDeals(limit = 8): Promise<ShowcaseProduct[]> {
     id: r.id,
     name: r.name,
     nameNl: r.name_nl,
-    category: r.category,
-    categoryNl: r.category_nl,
     nameDe: r.name_de,
     nameFr: r.name_fr,
-    categoryDe: r.category_de,
-    categoryFr: r.category_fr,
+    mainCategory: r.main_category,
+    subCategory: r.sub_category,
     imageUrl: r.image_url,
     priceCents: Number(r.price_cents),
     currency: r.currency,

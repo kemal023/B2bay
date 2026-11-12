@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ProductCard } from "@/components/product-card";
 import {
   isSortKey,
-  listCategorySummaries,
+  listCategoryTree,
   listProducts,
   SORT_OPTIONS,
   type SortKey,
@@ -15,7 +15,7 @@ import { priceAccessFor } from "@/lib/price-visibility";
 import { getDictionary } from "@/lib/i18n/server";
 import { intlLocale } from "@/lib/i18n/config";
 import { fmt, plural } from "@/lib/i18n/dictionaries";
-import { localizedCategory } from "@/lib/product-text";
+import { isMainSlug, isSubOf, mainLabel, subLabel } from "@/lib/taxonomy.mjs";
 import {
   ChevronLeft,
   ChevronRight,
@@ -28,13 +28,14 @@ import {
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string }>;
+  searchParams: Promise<{ q?: string; cat?: string; sub?: string }>;
 }): Promise<Metadata> {
-  const [{ q, category }, { locale, t }] = await Promise.all([searchParams, getDictionary()]);
-  if (category) {
-    const match = (await listCategorySummaries("name")).find((c) => c.category === category);
-    const label = match ? (localizedCategory(match, locale) ?? category) : category;
-    return { title: label, alternates: { canonical: `/products?category=${encodeURIComponent(category)}` } };
+  const [{ q, cat, sub }, { locale, t }] = await Promise.all([searchParams, getDictionary()]);
+  if (cat && isMainSlug(cat)) {
+    const subOk = sub && isSubOf(sub, cat);
+    const label = (subOk ? subLabel(sub, locale) : null) ?? mainLabel(cat, locale) ?? cat;
+    const qs = subOk ? `cat=${cat}&sub=${sub}` : `cat=${cat}`;
+    return { title: label, alternates: { canonical: `/products?${qs}` } };
   }
   // Search result pages are thin duplicates of the catalogue: keep them out of the index.
   if (q) return { title: `${t.catalog.searchResults}: ${q}`, robots: { index: false } };
@@ -46,14 +47,19 @@ export default async function ProductsPage({
 }: {
   searchParams: Promise<{
     q?: string;
-    category?: string;
+    cat?: string;
+    sub?: string;
     page?: string;
     sort?: string;
     min?: string;
     max?: string;
   }>;
 }) {
-  const { q, category, page: pageParam, sort: sortParam, min, max } = await searchParams;
+  const params = await searchParams;
+  const { q, page: pageParam, sort: sortParam, min, max } = params;
+  // Unknown slugs (old links, typos) are ignored rather than showing an empty page.
+  const cat = params.cat && isMainSlug(params.cat) ? params.cat : undefined;
+  const sub = cat && params.sub && isSubOf(params.sub, cat) ? params.sub : undefined;
   const page = Math.max(1, Number(pageParam) || 1);
   const sort: SortKey = isSortKey(sortParam) ? sortParam : "relevant";
 
@@ -75,26 +81,24 @@ export default async function ProductsPage({
   const maxEuro = showPrice ? euro(max) : undefined;
   const toList = (e: number) => Math.round((e * 100) / (1 - discount / 100));
 
-  const [{ products, total, totalPages, fuzzy }, categorySummaries] = await Promise.all([
+  const [{ products, total, totalPages, fuzzy }, tree] = await Promise.all([
     listProducts({
       q,
-      category,
+      main: cat,
+      sub,
       page,
       sort,
       locale,
       minPriceCents: minEuro != null ? toList(minEuro) : undefined,
       maxPriceCents: maxEuro != null ? toList(maxEuro) : undefined,
     }),
-    listCategorySummaries("name"),
+    listCategoryTree(),
   ]);
   const num = (n: number) => n.toLocaleString(intlLocale(locale));
-  // URLs keep the stable English key; visitors see the label in their language.
-  const categories = categorySummaries
-    .map((cat) => ({ ...cat, label: localizedCategory(cat, locale) ?? cat.category }))
-    .sort((a, b) => a.label.localeCompare(b.label, locale));
-  const categoryLabel = category
-    ? (categories.find((cat) => cat.category === category)?.label ?? category)
-    : null;
+  // URLs carry the stable slug; visitors see the label in their language.
+  const mainName = cat ? (mainLabel(cat, locale) ?? cat) : null;
+  const subName = sub ? subLabel(sub, locale) : null;
+  const categoryLabel = subName ?? mainName;
   // Sorting by price would reveal the price order to visitors who aren't
   // allowed to see the prices themselves.
   const sortOptions = Object.entries(SORT_OPTIONS).filter(
@@ -105,7 +109,8 @@ export default async function ProductsPage({
     const params = new URLSearchParams();
     const merged = {
       q,
-      category,
+      cat,
+      sub,
       sort: sort === "relevant" ? undefined : sort,
       min: minEuro != null ? String(minEuro) : undefined,
       max: maxEuro != null ? String(maxEuro) : undefined,
@@ -119,7 +124,7 @@ export default async function ProductsPage({
   }
 
   const hasPrice = minEuro != null || maxEuro != null;
-  const hasFilters = Boolean(q || category || hasPrice);
+  const hasFilters = Boolean(q || cat || hasPrice);
   const firstResult = (page - 1) * 24 + 1;
   const lastResult = Math.min(page * 24, total);
 
@@ -130,13 +135,23 @@ export default async function ProductsPage({
           {t.common.home}
         </Link>
         <span className="text-border">/</span>
-        {category ? (
+        {cat ? (
           <>
             <Link href="/products" className="transition-colors hover:text-foreground">
               {t.common.products}
             </Link>
             <span className="text-border">/</span>
-            <span className="text-foreground">{categoryLabel}</span>
+            {sub ? (
+              <>
+                <Link href={`/products?cat=${cat}`} className="transition-colors hover:text-foreground">
+                  {mainName}
+                </Link>
+                <span className="text-border">/</span>
+                <span className="text-foreground">{subName}</span>
+              </>
+            ) : (
+              <span className="text-foreground">{mainName}</span>
+            )}
           </>
         ) : (
           <span className="text-foreground">{t.common.products}</span>
@@ -163,7 +178,8 @@ export default async function ProductsPage({
         </div>
 
         <form action="/products" className="relative w-full max-w-sm">
-          {category && <input type="hidden" name="category" value={category} />}
+          {cat && <input type="hidden" name="cat" value={cat} />}
+          {sub && <input type="hidden" name="sub" value={sub} />}
           {sort !== "relevant" && <input type="hidden" name="sort" value={sort} />}
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -186,32 +202,55 @@ export default async function ProductsPage({
             </h2>
             <nav className="mt-3 max-h-[60vh] space-y-0.5 overflow-y-auto pr-1">
               <Link
-                href={hrefWith({ category: undefined, page: undefined })}
+                href={hrefWith({ cat: undefined, sub: undefined, page: undefined })}
                 className={`flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
-                  category
+                  cat
                     ? "text-muted-foreground hover:bg-accent hover:text-foreground"
                     : "bg-accent font-medium text-accent-foreground"
                 }`}
               >
                 {t.common.allCategories}
               </Link>
-              {categories.map((cat) => {
-                const active = cat.category === category;
+              {tree.map((node) => {
+                const open = node.slug === cat;
                 return (
-                  <Link
-                    key={cat.category}
-                    href={hrefWith({ category: cat.category, page: undefined })}
-                    className={`flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
-                      active
-                        ? "bg-accent font-medium text-accent-foreground"
-                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                    }`}
-                  >
-                    <span className="truncate">{cat.label}</span>
-                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                      {num(cat.productCount)}
-                    </span>
-                  </Link>
+                  <div key={node.slug}>
+                    <Link
+                      href={hrefWith({ cat: node.slug, sub: undefined, page: undefined })}
+                      className={`flex items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
+                        open && !sub
+                          ? "bg-accent font-medium text-accent-foreground"
+                          : open
+                            ? "font-medium text-foreground hover:bg-accent"
+                            : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      }`}
+                    >
+                      <span className="truncate">{mainLabel(node.slug, locale)}</span>
+                      <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                        {num(node.productCount)}
+                      </span>
+                    </Link>
+                    {open && node.subs.length > 0 && (
+                      <div className="mb-1 ml-2.5 border-l border-border pl-2">
+                        {node.subs.map((s) => (
+                          <Link
+                            key={s.slug}
+                            href={hrefWith({ cat: node.slug, sub: s.slug, page: undefined })}
+                            className={`flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[13px] transition-colors ${
+                              s.slug === sub
+                                ? "bg-accent font-medium text-accent-foreground"
+                                : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                            }`}
+                          >
+                            <span className="truncate">{subLabel(s.slug, locale)}</span>
+                            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                              {num(s.productCount)}
+                            </span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </nav>
@@ -220,7 +259,8 @@ export default async function ProductsPage({
               <form action="/products" className="mt-6 border-t border-border pt-5">
                 <h2 className="text-sm font-semibold">{c.priceFilter}</h2>
                 {q && <input type="hidden" name="q" value={q} />}
-                {category && <input type="hidden" name="category" value={category} />}
+                {cat && <input type="hidden" name="cat" value={cat} />}
+          {sub && <input type="hidden" name="sub" value={sub} />}
                 {sort !== "relevant" && <input type="hidden" name="sort" value={sort} />}
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <Input
@@ -260,9 +300,9 @@ export default async function ProductsPage({
             <div className="flex flex-wrap items-center gap-2">
               {hasFilters ? (
                 <>
-                  {category && (
+                  {cat && (
                     <Link
-                      href={hrefWith({ category: undefined, page: undefined })}
+                      href={hrefWith({ cat: undefined, sub: undefined, page: undefined })}
                       className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium transition-colors hover:bg-muted"
                     >
                       {categoryLabel}
@@ -305,7 +345,8 @@ export default async function ProductsPage({
 
             <form action="/products" className="flex items-center gap-2">
               {q && <input type="hidden" name="q" value={q} />}
-              {category && <input type="hidden" name="category" value={category} />}
+              {cat && <input type="hidden" name="cat" value={cat} />}
+          {sub && <input type="hidden" name="sub" value={sub} />}
               <label htmlFor="sort" className="text-xs text-muted-foreground">
                 {c.sort}
               </label>

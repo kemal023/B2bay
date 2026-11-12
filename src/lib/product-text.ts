@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/i18n/config";
+import { mainLabel, subLabel } from "@/lib/taxonomy.mjs";
 
 /**
  * Picks the text a visitor sees for a product in their language. The
@@ -45,6 +46,29 @@ export function localizedName(p: NameFields, locale: Locale): string {
 
 export function localizedCategory(p: CategoryFields, locale: Locale): string | null {
   return pick(locale, p.category, p.categoryNl, p.categoryDe, p.categoryFr);
+}
+
+type ShopCategoryFields = Partial<CategoryFields> & {
+  mainCategory?: string | null;
+  subCategory?: string | null;
+};
+
+/**
+ * The category shown on a product: its place in the shop's own tree
+ * (subcategory if it has one), falling back to the supplier's category for
+ * a product that hasn't been placed yet.
+ */
+export function shopCategoryLabel(p: ShopCategoryFields, locale: Locale): string | null {
+  return (
+    subLabel(p.subCategory, locale) ??
+    mainLabel(p.mainCategory, locale) ??
+    (p.category !== undefined
+      ? localizedCategory(
+          { category: p.category ?? null, categoryNl: p.categoryNl ?? null, categoryDe: p.categoryDe, categoryFr: p.categoryFr },
+          locale,
+        )
+      : null)
+  );
 }
 
 export function localizedDescription(

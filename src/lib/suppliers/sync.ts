@@ -31,7 +31,7 @@ function sellPriceFromCost(costPriceCents: number, markupPercent: number): numbe
 // row-identifying columns, which differ: supplier_id+supplier_sku for a
 // fresh/normal upsert, vs. id for an EAN-linked relink).
 const COMMON_COLUMNS =
-  "ean, name, source_name, description, source_description, image_url, category, source_category, unit, cost_price_cents, price_cents, currency, stock_qty, min_order_qty";
+  "ean, name, source_name, description, source_description, image_url, category, source_category, supplier_category_path, unit, cost_price_cents, price_cents, currency, stock_qty, min_order_qty";
 
 // On every sync the source_* columns get the supplier's current raw text.
 // The customer-facing column only follows it for a new row, a field that was
@@ -42,7 +42,8 @@ const COMMON_COLUMNS =
 function commonValues(item: NormalizedProduct, markupPercent: number) {
   const description = item.description ?? null;
   const category = item.category ?? null;
-  return sql`${item.ean ?? null}::text, ${item.name}::text, ${item.name}::text, ${description}::text, ${description}::text, ${item.imageUrl ?? null}::text, ${category}::text, ${category}::text, ${item.unit ?? "stuk"}::text, ${item.costPriceCents}::integer, ${sellPriceFromCost(item.costPriceCents, markupPercent)}::integer, ${item.currency ?? "EUR"}::text, ${item.stockQty}::integer, ${item.minOrderQty ?? 1}::integer`;
+  const path = (item.categoryPath ?? (category ? [category] : [])).join(" > ") || null;
+  return sql`${item.ean ?? null}::text, ${item.name}::text, ${item.name}::text, ${description}::text, ${description}::text, ${item.imageUrl ?? null}::text, ${category}::text, ${category}::text, ${path}::text, ${item.unit ?? "stuk"}::text, ${item.costPriceCents}::integer, ${sellPriceFromCost(item.costPriceCents, markupPercent)}::integer, ${item.currency ?? "EUR"}::text, ${item.stockQty}::integer, ${item.minOrderQty ?? 1}::integer`;
 }
 
 // Applies to both write paths: protects an admin-edited OR already-
@@ -57,6 +58,7 @@ const PROTECTED_SET = sql`
   source_name = excluded.source_name,
   source_description = excluded.source_description,
   source_category = excluded.source_category,
+  supplier_category_path = excluded.supplier_category_path,
   name = CASE
     WHEN products.customized THEN products.name
     WHEN products.source_name IS DISTINCT FROM excluded.source_name THEN excluded.name
@@ -97,7 +99,7 @@ async function upsertBySkuBatch(
 
   await db.execute(sql`
     INSERT INTO products (${sql.raw(columns)}, active, updated_at)
-    SELECT v.supplier_id, v.supplier_sku, v.ean, v.name, v.source_name, v.description, v.source_description, v.image_url, v.category, v.source_category, v.unit, v.cost_price_cents, v.price_cents, v.currency, v.stock_qty, v.min_order_qty, true, now()
+    SELECT v.supplier_id, v.supplier_sku, v.ean, v.name, v.source_name, v.description, v.source_description, v.image_url, v.category, v.source_category, v.supplier_category_path, v.unit, v.cost_price_cents, v.price_cents, v.currency, v.stock_qty, v.min_order_qty, true, now()
     FROM (VALUES ${sql.join(rows, sql`, `)}) AS v(${sql.raw(columns)})
     ON CONFLICT (supplier_id, supplier_sku) DO UPDATE SET ${PROTECTED_SET}
   `);

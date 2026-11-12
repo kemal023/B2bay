@@ -283,6 +283,19 @@ export const products = pgTable(
     categoryDe: text("category_de"),
     categoryFr: text("category_fr"),
     sourceCategory: text("source_category"),
+    // The supplier's full category path ("Tools > Power tools > Drills"),
+    // refreshed on every sync; the key into category_mappings.
+    supplierCategoryPath: text("supplier_category_path"),
+    // The shop's own tree (src/lib/taxonomy.mjs): what customers browse by.
+    mainCategory: text("main_category"),
+    subCategory: text("sub_category"),
+    // How main/sub were set: "mapping" (a confirmed supplier-category
+    // mapping), "auto" (guessed from the name) or "manual" (an admin; kept).
+    categoryOrigin: text("category_origin"),
+    // md5 of the inputs main/sub were derived from; when it no longer
+    // matches (new path, new name, changed mapping) scripts/categorize.mjs
+    // places the product again.
+    categoryKey: text("category_key"),
     // Detected or configured language of the source_* fields.
     sourceLang: text("source_lang"),
     // md5 of the inputs each field was last translated from. When a sync
@@ -318,6 +331,34 @@ export const products = pgTable(
     uniqueIndex("products_supplier_sku_idx").on(t.supplierId, t.supplierSku),
     uniqueIndex("products_ean_idx").on(t.ean),
   ],
+);
+
+/**
+ * How a supplier's own category maps onto the shop's tree. One row per
+ * supplier category path the sync has seen. New paths start as "suggested"
+ * (worked out from their product names); an admin confirms or corrects
+ * them. Only confirmed rows are applied wholesale — a suggested one leaves
+ * each product to be placed by its own name.
+ *
+ * A row may cover a path prefix: "Tools" confirmed also places
+ * "Tools > Power tools > Drills", unless a longer path has its own row.
+ */
+export const categoryMappings = pgTable(
+  "category_mappings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    supplierId: uuid("supplier_id")
+      .notNull()
+      .references(() => suppliers.id, { onDelete: "cascade" }),
+    sourcePath: text("source_path").notNull(),
+    mainCategory: text("main_category"),
+    // Null: the main category is certain, the subcategory is decided per product.
+    subCategory: text("sub_category"),
+    status: text("status").notNull().default("suggested"), // suggested | confirmed
+    productCount: integer("product_count").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("category_mappings_supplier_path_idx").on(t.supplierId, t.sourcePath)],
 );
 
 /**

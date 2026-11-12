@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { products } from "@/db/schema";
 import { isPlatformAdmin } from "@/lib/auth";
+import { parseShopCategory } from "@/lib/shop-category";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -28,8 +29,17 @@ function readProductForm(formData: FormData) {
   const stockQty = Number(formData.get("stockQty") ?? 0);
   const minOrderQty = Number(formData.get("minOrderQty") ?? 1);
   const active = formData.get("active") === "on";
+  // "" = automatic; otherwise the admin pins the product to a place in the tree.
+  const shopCategory = parseShopCategory(String(formData.get("shopCategory") ?? ""));
 
-  return { name, ean, description, imageUrl, category, unit, priceEuro, stockQty, minOrderQty, active };
+  return { name, ean, description, imageUrl, category, unit, priceEuro, stockQty, minOrderQty, active, shopCategory };
+}
+
+/** Columns for the shop category: pinned by the admin, or handed back to scripts/categorize.mjs. */
+function shopCategoryColumns(place: { main: string; sub: string | null } | null) {
+  return place
+    ? { mainCategory: place.main, subCategory: place.sub, categoryOrigin: "manual", categoryKey: null }
+    : { categoryOrigin: null, categoryKey: null };
 }
 
 /** Adds a product the store owns outright — no supplier, admin sets everything. */
@@ -52,6 +62,7 @@ export async function createProduct(formData: FormData): Promise<ActionResult> {
       description: f.description || null,
       imageUrl: f.imageUrl || null,
       category: f.category || null,
+      ...shopCategoryColumns(f.shopCategory),
       unit: f.unit,
       costPriceCents: null,
       priceCents: Math.round(f.priceEuro * 100),
@@ -92,6 +103,7 @@ export async function updateProduct(id: string, formData: FormData): Promise<Act
         description: f.description || null,
         imageUrl: f.imageUrl || null,
         category: f.category || null,
+        ...shopCategoryColumns(f.shopCategory),
         unit: f.unit,
         priceCents: Math.round(f.priceEuro * 100),
         stockQty: Number.isFinite(f.stockQty) ? Math.max(0, Math.round(f.stockQty)) : 0,

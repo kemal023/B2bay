@@ -47,9 +47,23 @@ async function fetchText(url: string): Promise<string> {
   return res.text();
 }
 
-/** Category id -> English name + parent id. The feed is small enough to buffer whole. */
-function parseCategories(xml: string): Map<number, { name: string; parent: number }> {
+type CategoryTree = Map<number, { label: string; parent: number }>;
+
+/**
+ * Category id -> English name + parent id, and the whole tree with the best
+ * name each node has. The feed is small enough to buffer whole.
+ *
+ * The English-only map keeps feeding the display category as before. The
+ * tree is for the category path: many of Annapol's subcategories have no
+ * English name (only German or Polish), and leaving them out would cut the
+ * path short.
+ */
+function parseCategories(xml: string): {
+  categories: Map<number, { name: string; parent: number }>;
+  tree: CategoryTree;
+} {
   const categories = new Map<number, { name: string; parent: number }>();
+  const tree: CategoryTree = new Map();
   const parser = sax.parser(false, { trim: true, lowercase: true });
 
   let currentId: number | null = null;
@@ -57,11 +71,13 @@ function parseCategories(xml: string): Map<number, { name: string; parent: numbe
   let inName = false;
   let currentLang = "";
   let buf = "";
+  let names: Record<string, string> = {};
 
   parser.onopentag = (node) => {
     if (node.name === "category") {
       currentId = Number(node.attributes.id);
       currentParent = Number(node.attributes.parent ?? 0);
+      names = {};
     } else if (node.name === "name") {
       inName = true;
       buf = "";
@@ -77,14 +93,33 @@ function parseCategories(xml: string): Map<number, { name: string; parent: numbe
   parser.onclosetag = (tag) => {
     if (tag === "name") {
       inName = false;
+      if (buf.trim()) names[currentLang] = buf.trim();
       if (currentId != null && currentLang === "en" && buf.trim()) {
         categories.set(currentId, { name: buf.trim(), parent: currentParent });
       }
+    } else if (tag === "category" && currentId != null) {
+      const label = names.en ?? names.de ?? names.pl ?? Object.values(names)[0];
+      if (label) tree.set(currentId, { label, parent: currentParent });
     }
   };
 
   parser.write(xml).close();
-  return categories;
+  return { categories, tree };
+}
+
+/** "Tools > Hand tools > Pliers": the category's path from the top, best names. */
+function categoryPath(categoryId: number, tree: CategoryTree): string[] {
+  const path: string[] = [];
+  const seen = new Set<number>();
+  let id = categoryId;
+  while (id && !seen.has(id)) {
+    seen.add(id);
+    const node = tree.get(id);
+    if (!node) break;
+    path.unshift(node.label);
+    id = node.parent;
+  }
+  return path;
 }
 
 // A handful of Annapol's own top-level category nodes have no English
@@ -168,6 +203,7 @@ async function streamProducts(
   url: string,
   stockById: Map<number, StockEntry>,
   categories: Map<number, { name: string; parent: number }>,
+  tree: CategoryTree,
 ): Promise<NormalizedProduct[]> {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) {
@@ -275,6 +311,7 @@ async function streamProducts(
           description: p.description ? stripHtml(p.description) : undefined,
           imageUrl: p.images[0],
           category: category || undefined,
+          categoryPath: p.categoryId != null ? categoryPath(p.categoryId, tree) : undefined,
           unit: "stuk",
           costPriceCents: Math.round(priceEur * 100),
           currency: "EUR",
@@ -315,9 +352,9 @@ export const annapolAdapter: SupplierAdapter = {
       fetchText(buildUrl("xml-stock.php", user, hash)),
     ]);
 
-    const categories = parseCategories(categoriesXml);
+    const { categories, tree } = parseCategories(categoriesXml);
     const stockById = parseStock(stockXml);
 
-    return streamProducts(buildUrl("xml-products.php", user, hash), stockById, categories);
+    return streamProducts(buildUrl("xml-products.php", user, hash), stockById, categories, tree);
   },
 };

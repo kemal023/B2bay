@@ -18,11 +18,12 @@ import { favorites } from "@/db/schema";
 import { intlLocale } from "@/lib/i18n/config";
 import { fmt } from "@/lib/i18n/dictionaries";
 import {
-  localizedCategory,
   localizedDescription,
   localizedName,
   localizedUnit,
+  shopCategoryLabel,
 } from "@/lib/product-text";
+import { mainLabel, subLabel } from "@/lib/taxonomy.mjs";
 import { FileCheck2, ImageOff, Languages, Lock, PackageCheck, Truck } from "lucide-react";
 
 const USP_ICONS = [PackageCheck, Truck, FileCheck2];
@@ -37,9 +38,9 @@ export async function generateMetadata({
   if (!product) return {};
   const name = localizedName(product, locale);
   const description = localizedDescription(product, locale).text;
-  const category = localizedCategory(product, locale);
+  const category = shopCategoryLabel(product, locale);
   const summary = (description ?? [name, category, product.ean && `EAN ${product.ean}`].filter(Boolean).join(" · "))
-    .replace(/s+/g, " ")
+    .replace(/\s+/g, " ")
     .slice(0, 160);
   return {
     title: name,
@@ -84,15 +85,28 @@ export default async function ProductDetailPage({
   const num = (n: number) => n.toLocaleString(intlLocale(locale));
 
   const name = localizedName(product, locale);
-  const category = localizedCategory(product, locale);
+  const category = shopCategoryLabel(product, locale);
+  const mainName = mainLabel(product.mainCategory, locale);
+  const subName = subLabel(product.subCategory, locale);
+  // "More from": the subcategory when there is one, so the suggestions are close relatives.
+  const moreHref = product.subCategory
+    ? `/products?cat=${product.mainCategory}&sub=${product.subCategory}`
+    : `/products?cat=${product.mainCategory}`;
   const unit = localizedUnit(product.unit, locale);
   const description = localizedDescription(product, locale);
 
   // Someone wants to read this one: let it skip the translation queue.
   if (description.pending) await requestDescriptionTranslation(product.id);
 
-  const related = product.category
-    ? (await listProducts({ category: product.category, sort: "relevant", locale })).products
+  const related = product.mainCategory
+    ? (
+        await listProducts({
+          main: product.mainCategory,
+          sub: product.subCategory ?? undefined,
+          sort: "relevant",
+          locale,
+        })
+      ).products
         .filter((r) => r.id !== product.id)
         .slice(0, 4)
     : [];
@@ -118,14 +132,19 @@ export default async function ProductDetailPage({
         <Link href="/products" className="transition-colors hover:text-foreground">
           {t.common.products}
         </Link>
-        {product.category && (
+        {mainName && (
           <>
             <span className="text-border">/</span>
-            <Link
-              href={`/products?category=${encodeURIComponent(product.category)}`}
-              className="transition-colors hover:text-foreground"
-            >
-              {category}
+            <Link href={`/products?cat=${product.mainCategory}`} className="transition-colors hover:text-foreground">
+              {mainName}
+            </Link>
+          </>
+        )}
+        {mainName && subName && (
+          <>
+            <span className="text-border">/</span>
+            <Link href={moreHref} className="transition-colors hover:text-foreground">
+              {subName}
             </Link>
           </>
         )}
@@ -298,7 +317,7 @@ export default async function ProductDetailPage({
               {fmt(p.moreFrom, { category: category ?? "" })}
             </h2>
             <Button asChild variant="ghost" className="text-primary hover:text-primary">
-              <Link href={`/products?category=${encodeURIComponent(product.category!)}`}>
+              <Link href={moreHref}>
                 {p.viewAll}
               </Link>
             </Button>

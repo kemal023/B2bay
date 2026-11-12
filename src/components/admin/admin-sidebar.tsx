@@ -8,6 +8,7 @@ import { logoutAction } from "@/lib/actions/auth";
 import {
   BarChart3,
   Boxes,
+  FolderTree,
   Building2,
   ClipboardList,
   LayoutDashboard,
@@ -56,6 +57,7 @@ export function AdminSidebar({
       items: [
         { href: "/admin/products", label: "Producten", icon: Package },
         { href: "/admin/suppliers", label: "Leveranciers", icon: Boxes },
+        { href: "/admin/categories", label: "Categorieën", icon: FolderTree },
         { href: "/admin/rules", label: "Regels", icon: SlidersHorizontal },
       ],
     },

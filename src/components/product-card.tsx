@@ -4,7 +4,7 @@ import { formatPriceCents } from "@/lib/format";
 import type { PriceAccess } from "@/lib/price-visibility";
 import type { Locale } from "@/lib/i18n/config";
 import { dictionaries, fmt } from "@/lib/i18n/dictionaries";
-import { localizedCategory, localizedName, localizedUnit } from "@/lib/product-text";
+import { localizedName, localizedUnit, shopCategoryLabel } from "@/lib/product-text";
 
 export type ProductCardProduct = {
   id: string;
@@ -12,10 +12,12 @@ export type ProductCardProduct = {
   nameNl: string | null;
   nameDe?: string | null;
   nameFr?: string | null;
-  category: string | null;
-  categoryNl: string | null;
+  category?: string | null;
+  categoryNl?: string | null;
   categoryDe?: string | null;
   categoryFr?: string | null;
+  mainCategory?: string | null;
+  subCategory?: string | null;
   imageUrl: string | null;
   priceCents: number;
   currency: string;
@@ -39,7 +41,7 @@ export function ProductCard({
   const t = dictionaries[locale];
   const showPrice = priceAccess === "visible";
   const name = localizedName(product, locale);
-  const category = localizedCategory(product, locale);
+  const category = shopCategoryLabel(product, locale);
   const price = Math.round(product.priceCents * (1 - discountPercent / 100));
 
   return (

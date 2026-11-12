@@ -36,6 +36,7 @@ import {
   sentenceCase,
   untranslatedWords,
 } from "../src/lib/translation-guard.mjs";
+import { categorizeStep } from "./categorize.mjs";
 
 const sql = neon(process.env.DATABASE_URL);
 const TRANSLATE_URL = process.env.TRANSLATE_URL ?? "http://localhost:5050";
@@ -569,7 +570,7 @@ async function translateExtraDescriptions(lang) {
 // Main loop
 // ---------------------------------------------------------------------------
 
-const totals = { names: 0, categories: 0, descriptions: 0 };
+const totals = { names: 0, categories: 0, descriptions: 0, placed: 0 };
 
 /** German/French work, only for languages LibreTranslate has loaded. */
 async function extraStep(kind) {
@@ -585,6 +586,11 @@ async function extraStep(kind) {
 }
 
 async function step() {
+  // Shop categories first: no translation calls, a few seconds per 2,000
+  // products, and a new or changed product should be findable in the menu
+  // right away (scripts/categorize.mjs).
+  let placed = await categorizeStep(sql, log);
+  if (placed) return (totals.placed += placed), true;
   // English and Dutch first: they are what most visitors see.
   let n = await translateDescriptions(true);
   if (n) return (totals.descriptions += n), true;
@@ -629,7 +635,7 @@ async function main() {
 
     if (worked) {
       if (++steps % 25 === 0) {
-        log(`namen ${nl(totals.names)} · categorieën ${nl(totals.categories)} · omschrijvingen ${nl(totals.descriptions)}`);
+        log(`namen ${nl(totals.names)} · categorieën ${nl(totals.categories)} · omschrijvingen ${nl(totals.descriptions)} · ingedeeld ${nl(totals.placed)}`);
       }
       await sleep(PAUSE_MS);
     } else {

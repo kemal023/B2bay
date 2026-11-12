@@ -6,6 +6,7 @@ export const de: Dictionary = {
     products: "Produkte",
     allProducts: "Alle Produkte",
     allCategories: "Alle Kategorien",
+    allIn: "Alles in",
     categories: "Kategorien",
     cart: "Warenkorb",
     dashboard: "Dashboard",

@@ -1,4 +1,4 @@
-import { listCategorySummaries } from "@/lib/products";
+import { listCategoryTree } from "@/lib/products";
 import { productPage, siteUrl, urlset, xml } from "@/lib/sitemap";
 
 export const dynamic = "force-dynamic";
@@ -7,12 +7,15 @@ export async function GET(_req: Request, { params }: { params: Promise<{ name: s
   const { name } = await params;
 
   if (name === "pages.xml") {
-    const categories = await listCategorySummaries("name");
+    const tree = await listCategoryTree();
     return xml(
       urlset([
         { loc: siteUrl("/") },
         { loc: siteUrl("/products") },
-        ...categories.map((c) => ({ loc: siteUrl(`/products?category=${encodeURIComponent(c.category)}`) })),
+        ...tree.flatMap((c) => [
+          { loc: siteUrl(`/products?cat=${c.slug}`) },
+          ...c.subs.map((s) => ({ loc: siteUrl(`/products?cat=${c.slug}&sub=${s.slug}`) })),
+        ]),
         { loc: siteUrl("/terms") },
         { loc: siteUrl("/privacy") },
       ]),

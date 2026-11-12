@@ -105,3 +105,36 @@ describe("CSV export", () => {
     expect(csvEuro(null)).toBe("");
   });
 });
+
+describe("shop categories", () => {
+  it("knows its tree and rejects places outside it", async () => {
+    const { parseShopCategory } = await import("@/lib/shop-category");
+    expect(parseShopCategory("tools/power-tools")).toEqual({ main: "tools", sub: "power-tools" });
+    expect(parseShopCategory("tools")).toEqual({ main: "tools", sub: null });
+    expect(parseShopCategory("tools/baby")).toBeNull(); // baby belongs to toys
+    expect(parseShopCategory("nonsense")).toBeNull();
+  });
+
+  it("labels every category in all four languages", async () => {
+    const { TAXONOMY } = await import("@/lib/taxonomy.mjs");
+    const slugs = new Set<string>();
+    for (const m of TAXONOMY) {
+      for (const node of [m, ...m.subs]) {
+        for (const l of ["nl", "en", "de", "fr"] as const) expect(node.labels[l]).toBeTruthy();
+        expect(slugs.has(node.slug)).toBe(false);
+        slugs.add(node.slug);
+      }
+    }
+  });
+
+  it("seeds only valid places", async () => {
+    const { SEED } = await import("../../scripts/category-seed.mjs");
+    const { isMainSlug, isSubOf } = await import("@/lib/taxonomy.mjs");
+    for (const paths of Object.values(SEED) as Record<string, [string, string | null]>[]) {
+      for (const [path, [main, sub]] of Object.entries(paths)) {
+        expect(isMainSlug(main), path).toBe(true);
+        if (sub) expect(isSubOf(sub, main), path).toBe(true);
+      }
+    }
+  });
+});

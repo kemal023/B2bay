@@ -6,9 +6,10 @@ import { UserMenu } from "@/components/user-menu";
 import { MobileNav } from "@/components/mobile-nav";
 import { SiteLogo } from "@/components/site-logo";
 import { getAppUser } from "@/lib/auth";
-import { listCategorySummaries } from "@/lib/products";
+import { listCategoryTree } from "@/lib/products";
 import { getDictionary } from "@/lib/i18n/server";
-import { localizedCategory } from "@/lib/product-text";
+import { mainLabel, subLabel } from "@/lib/taxonomy.mjs";
+import type { NavCategory } from "@/components/mobile-nav";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { fmt } from "@/lib/i18n/dictionaries";
 import { formatPriceCents } from "@/lib/format";
@@ -17,6 +18,7 @@ import { getCompanyDetails } from "@/lib/invoicing";
 import { FALLBACK_EMAIL } from "@/lib/brand";
 import {
   BadgeCheck,
+  ChevronDown,
   LayoutDashboard,
   PackageCheck,
   Search,
@@ -24,21 +26,28 @@ import {
   Truck,
 } from "lucide-react";
 
-const NAV_CATEGORY_COUNT = 6;
+// Main categories shown directly in the bar (the biggest); all of them are in the "Categories" menu.
+const NAV_CATEGORY_COUNT = 5;
 
 export async function SiteHeader() {
   const [user, categories, { locale, t }, shipping, seller] = await Promise.all([
     getAppUser(),
-    listCategorySummaries(),
+    listCategoryTree(),
     getDictionary(),
     getShippingSettings(),
     getCompanyDetails(),
   ]);
   const contactEmail = seller.email || FALLBACK_EMAIL;
-  const navCategories = categories
+  const allCategories: NavCategory[] = categories.map((c) => ({
+    slug: c.slug,
+    label: mainLabel(c.slug, locale) ?? c.slug,
+    subs: c.subs.map((s) => ({ slug: s.slug, label: subLabel(s.slug, locale) ?? s.slug })),
+  }));
+  const navCategories = [...categories]
+    .filter((c) => c.slug !== "other")
+    .sort((a, b) => b.productCount - a.productCount)
     .slice(0, NAV_CATEGORY_COUNT)
-    .map((c) => ({ value: c.category, label: localizedCategory(c, locale) ?? c.category }))
-    .sort((a, b) => a.label.localeCompare(b.label, locale));
+    .map((c) => allCategories.find((n) => n.slug === c.slug)!);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-card/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-card/85">
@@ -76,7 +85,7 @@ export async function SiteHeader() {
       </div>
 
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6">
-        <MobileNav categories={navCategories} signedIn={Boolean(user)} />
+        <MobileNav categories={allCategories} signedIn={Boolean(user)} />
 
         <Link href="/" className="flex shrink-0 items-center" aria-label="Cosme International">
           <SiteLogo height={36} priority className="dark:rounded-md dark:bg-white dark:px-2 dark:py-1" />
@@ -142,30 +151,74 @@ export async function SiteHeader() {
         />
       </form>
 
-      {navCategories.length > 0 && (
+      {allCategories.length > 0 && (
         <nav className="hidden border-t border-border/60 md:block">
           <div className="mx-auto flex h-11 max-w-7xl items-center gap-1 px-4 sm:px-6">
-            <Link
-              href="/products"
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            >
-              {t.common.allProducts}
-            </Link>
+            {/* All categories: opens on hover or keyboard focus, no script needed. */}
+            <div className="group relative">
+              <Link
+                href="/products"
+                className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              >
+                {t.common.categories}
+                <ChevronDown className="h-3.5 w-3.5 transition-transform group-hover:rotate-180" />
+              </Link>
+              <div className="invisible absolute left-0 top-full z-50 w-[min(64rem,calc(100vw-2rem))] pt-1 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+                <div className="grid max-h-[70vh] grid-cols-2 gap-x-6 gap-y-5 overflow-y-auto rounded-xl border border-border bg-card p-5 shadow-xl lg:grid-cols-4">
+                  {allCategories.map((c) => (
+                    <div key={c.slug} className="min-w-0">
+                      <Link href={`/products?cat=${c.slug}`} className="text-sm font-semibold hover:text-primary">
+                        {c.label}
+                      </Link>
+                      <ul className="mt-1.5 space-y-1">
+                        {c.subs.map((s) => (
+                          <li key={s.slug}>
+                            <Link
+                              href={`/products?cat=${c.slug}&sub=${s.slug}`}
+                              className="block truncate text-[13px] text-muted-foreground hover:text-foreground"
+                            >
+                              {s.label}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
             <span className="mx-1 h-4 w-px bg-border" />
             {navCategories.map((c) => (
-              <Link
-                key={c.value}
-                href={`/products?category=${encodeURIComponent(c.value)}`}
-                className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-              >
-                {c.label}
-              </Link>
+              <div key={c.slug} className="group/item relative">
+                <Link
+                  href={`/products?cat=${c.slug}`}
+                  className="block whitespace-nowrap rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                >
+                  {c.label}
+                </Link>
+                {c.subs.length > 0 && (
+                  <div className="invisible absolute left-0 top-full z-50 min-w-56 pt-1 opacity-0 transition-opacity group-focus-within/item:visible group-focus-within/item:opacity-100 group-hover/item:visible group-hover/item:opacity-100">
+                    <ul className="rounded-xl border border-border bg-card p-2 shadow-xl">
+                      {c.subs.map((s) => (
+                        <li key={s.slug}>
+                          <Link
+                            href={`/products?cat=${c.slug}&sub=${s.slug}`}
+                            className="block whitespace-nowrap rounded-md px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                          >
+                            {s.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             ))}
             <Link
-              href="/#assortiment"
-              className="ml-auto rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              href="/products"
+              className="ml-auto whitespace-nowrap rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             >
-              {t.common.allCategories}
+              {t.common.allProducts}
             </Link>
           </div>
         </nav>

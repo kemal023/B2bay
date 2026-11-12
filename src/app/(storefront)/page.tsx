@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/product-card";
 import {
   getCatalogStats,
-  listCategorySummaries,
+  listCategoryTree,
   listTopDeals,
 } from "@/lib/products";
 import { getAppUserWithCompany } from "@/lib/auth";
@@ -23,15 +23,15 @@ import { priceAccessFor } from "@/lib/price-visibility";
 import { getDictionary } from "@/lib/i18n/server";
 import { intlLocale } from "@/lib/i18n/config";
 import { fmt, plural } from "@/lib/i18n/dictionaries";
-import { localizedCategory } from "@/lib/product-text";
+import { mainLabel, subLabel } from "@/lib/taxonomy.mjs";
 
-const FEATURED_CATEGORY_COUNT = 12;
+const FEATURED_CATEGORY_COUNT = 13;
 
 
 export default async function HomePage() {
   const [stats, categories, topDeals, user, { locale, t }] = await Promise.all([
     getCatalogStats(),
-    listCategorySummaries(),
+    listCategoryTree(),
     listTopDeals(8),
     getAppUserWithCompany(),
     getDictionary(),
@@ -42,12 +42,15 @@ export default async function HomePage() {
   const h = t.home;
   const formatCount = (n: number) => n.toLocaleString(intlLocale(locale));
 
-  // Pick the biggest categories, but show them A–Z: sorting before slicing
-  // would feature whatever starts with an A instead of what we mostly sell.
+  // The main categories in their fixed order, with a few subcategories as a taste of each.
   const featuredCategories = categories
+    .filter((c) => c.slug !== "other")
     .slice(0, FEATURED_CATEGORY_COUNT)
-    .map((c) => ({ ...c, label: localizedCategory(c, locale) ?? c.category }))
-    .sort((a, b) => a.label.localeCompare(b.label, locale));
+    .map((c) => ({
+      ...c,
+      label: mainLabel(c.slug, locale) ?? c.slug,
+      topSubs: [...c.subs].sort((a, b) => b.productCount - a.productCount).slice(0, 3),
+    }));
 
   const heroProducts = topDeals.filter((p) => p.imageUrl).slice(0, 4);
 
@@ -182,23 +185,35 @@ export default async function HomePage() {
 
             <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {featuredCategories.map((c) => (
-                <Link
-                  key={c.category}
-                  href={`/products?category=${encodeURIComponent(c.category)}`}
-                  className="group flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+                <div
+                  key={c.slug}
+                  className="group flex flex-col rounded-xl border border-border bg-card px-4 py-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
                 >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium transition-colors group-hover:text-primary">
-                      {c.label}
+                  <Link href={`/products?cat=${c.slug}`} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium transition-colors group-hover:text-primary">{c.label}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {plural(c.productCount, h.productCountOne, h.productCountOther, {
+                          count: formatCount(c.productCount),
+                        })}
+                      </div>
                     </div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">
-                      {plural(c.productCount, h.productCountOne, h.productCountOther, {
-                        count: formatCount(c.productCount),
-                      })}
+                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
+                  </Link>
+                  {c.topSubs.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {c.topSubs.map((s) => (
+                        <Link
+                          key={s.slug}
+                          href={`/products?cat=${c.slug}&sub=${s.slug}`}
+                          className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                        >
+                          {subLabel(s.slug, locale)}
+                        </Link>
+                      ))}
                     </div>
-                  </div>
-                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-primary" />
-                </Link>
+                  )}
+                </div>
               ))}
             </div>
 

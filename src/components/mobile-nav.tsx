@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu } from "lucide-react";
+import { ChevronDown, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -15,13 +15,15 @@ import { SiteLogo } from "@/components/site-logo";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useI18n } from "@/components/i18n-provider";
 
+export type NavCategory = { slug: string; label: string; subs: { slug: string; label: string }[] };
+
 const linkClass = "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent";
 
 export function MobileNav({
   categories,
   signedIn,
 }: {
-  categories: { value: string; label: string }[];
+  categories: NavCategory[];
   signedIn: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -74,14 +76,31 @@ export function MobileNav({
                 {t.common.categories}
               </p>
               {categories.map((c) => (
-                <Link
-                  key={c.value}
-                  href={`/products?category=${encodeURIComponent(c.value)}`}
-                  onClick={close}
-                  className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  {c.label}
-                </Link>
+                <details key={c.slug} className="group">
+                  <summary className="flex cursor-pointer list-none items-center justify-between rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+                    {c.label}
+                    {c.subs.length > 0 && <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />}
+                  </summary>
+                  <div className="mb-1 ml-3 flex flex-col border-l border-border pl-2">
+                    <Link
+                      href={`/products?cat=${c.slug}`}
+                      onClick={close}
+                      className="rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent"
+                    >
+                      {t.common.allIn} {c.label}
+                    </Link>
+                    {c.subs.map((s) => (
+                      <Link
+                        key={s.slug}
+                        href={`/products?cat=${c.slug}&sub=${s.slug}`}
+                        onClick={close}
+                        className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        {s.label}
+                      </Link>
+                    ))}
+                  </div>
+                </details>
               ))}
             </>
           )}

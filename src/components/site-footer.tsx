@@ -102,7 +102,7 @@ export async function SiteFooter() {
             </li>
             {seller.phone && (
               <li>
-                <a href={`tel:${seller.phone.replace(/s+/g, "")}`} className="transition-colors hover:text-foreground">
+                <a href={`tel:${seller.phone.replace(/\s+/g, "")}`} className="transition-colors hover:text-foreground">
                   {seller.phone}
                 </a>
               </li>

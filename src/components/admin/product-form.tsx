@@ -17,6 +17,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createProduct, updateProduct } from "@/lib/actions/products";
 import { Loader2 } from "lucide-react";
+import { ShopCategorySelect } from "@/components/admin/shop-category-select";
+import { shopCategoryValue } from "@/lib/shop-category";
+import { mainLabel, subLabel } from "@/lib/taxonomy.mjs";
 
 type ProductFormValues = {
   id: string;
@@ -25,6 +28,9 @@ type ProductFormValues = {
   description: string | null;
   imageUrl: string | null;
   category: string | null;
+  mainCategory?: string | null;
+  subCategory?: string | null;
+  categoryOrigin?: string | null;
   unit: string;
   priceCents: number;
   costPriceCents: number | null;
@@ -93,9 +99,24 @@ export function ProductForm({
             <Label htmlFor="imageUrl">Afbeelding-URL</Label>
             <Input id="imageUrl" name="imageUrl" defaultValue={product?.imageUrl ?? ""} />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="shopCategory">Categorie in de shop</Label>
+            <ShopCategorySelect
+              id="shopCategory"
+              name="shopCategory"
+              autoLabel="Automatisch (via de leverancierscategorie of de naam)"
+              defaultValue={
+                product?.categoryOrigin === "manual" ? shopCategoryValue(product.mainCategory, product.subCategory) : ""
+              }
+              className="h-9 w-full text-sm"
+            />
+            {product?.mainCategory && product.categoryOrigin !== "manual" && (
+              <p className="text-xs text-muted-foreground">Staat nu automatisch in: {mainLabel(product.mainCategory, "nl")}{product.subCategory ? ` › ${subLabel(product.subCategory, "nl")}` : ""}</p>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="category">Categorie</Label>
+              <Label htmlFor="category">Categorie (leverancier)</Label>
               <Input id="category" name="category" defaultValue={product?.category ?? ""} />
             </div>
             <div className="space-y-2">

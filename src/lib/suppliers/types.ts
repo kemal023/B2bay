@@ -17,6 +17,9 @@ export type NormalizedProduct = {
   description?: string;
   imageUrl?: string;
   category?: string;
+  /** The supplier's category from the top down (["Tools", "Hand tools"]).
+   * Mapped onto the shop's own tree; defaults to [category]. */
+  categoryPath?: string[];
   unit?: string;
   costPriceCents: number;
   currency?: string;
