@@ -22,14 +22,15 @@ async function requireAdmin() {
 export async function saveCategoryMapping(id: string, value: string): Promise<ActionResult> {
   try {
     await requireAdmin();
-    const place = parseShopCategory(value);
-    if (!place) return { ok: false, error: "Kies een categorie." };
+    // "" = per product: each product is placed by its own name (for catch-alls).
+    const place = value === "" ? null : parseShopCategory(value);
+    if (value !== "" && !place) return { ok: false, error: "Kies een categorie." };
     await getDb()
       .update(categoryMappings)
       .set({
-        mainCategory: place.main,
-        subCategory: place.sub,
-        status: "confirmed",
+        mainCategory: place?.main ?? null,
+        subCategory: place?.sub ?? null,
+        status: place ? "confirmed" : "per_product",
         updatedAt: new Date(),
       })
       .where(eq(categoryMappings.id, id));

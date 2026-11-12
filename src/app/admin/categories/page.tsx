@@ -29,7 +29,7 @@ export default async function AdminCategoriesPage() {
       FROM category_mappings c JOIN suppliers s ON s.id = c.supplier_id
       -- Only paths that currently have products; old ones stay stored but out of the way.
       WHERE c.product_count > 0
-      ORDER BY s.name, (c.status = 'suggested') DESC, c.product_count DESC
+      ORDER BY s.name, (c.status = 'suggested') DESC, (c.status = 'per_product') DESC, c.product_count DESC
     `),
     db.execute<{ main: string | null; sub: string | null; origin: string | null; n: number }>(sql`
       SELECT main_category AS main, sub_category AS sub, category_origin AS origin, COUNT(*)::int AS n
@@ -127,6 +127,8 @@ export default async function AdminCategoriesPage() {
                       <TableCell>
                         {r.status === "confirmed" ? (
                           <Badge variant="secondary">Bevestigd</Badge>
+                        ) : r.status === "per_product" ? (
+                          <Badge variant="outline">Per product</Badge>
                         ) : (
                           <Badge className="bg-amber-500/15 text-amber-700 hover:bg-amber-500/15 dark:text-amber-400">
                             Voorstel
@@ -137,8 +139,13 @@ export default async function AdminCategoriesPage() {
                         <CategoryMappingControl
                           id={r.id}
                           value={shopCategoryValue(r.main_category, r.sub_category)}
-                          confirmed={r.status === "confirmed"}
+                          confirmed={r.status !== "suggested"}
                         />
+                        {r.status === "per_product" && (
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            Verzamelcategorie: elk product wordt op zijn eigen naam in de shop ingedeeld.
+                          </p>
+                        )}
                         {r.status === "suggested" && (
                           <p className="mt-1 text-[11px] text-muted-foreground">
                             Tot je het goedkeurt, wordt elk product op zijn eigen naam ingedeeld.

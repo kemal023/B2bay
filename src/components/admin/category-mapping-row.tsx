@@ -32,6 +32,7 @@ export function CategoryMappingControl({
     <div className="flex items-center gap-2">
       <ShopCategorySelect
         defaultValue={current}
+        autoLabel="Per product op naam indelen"
         disabled={isPending}
         className="h-8 w-80 text-xs"
         onChange={(next) => {
@@ -40,7 +41,7 @@ export function CategoryMappingControl({
         }}
       />
       {!confirmed && (
-        <Button size="sm" variant="outline" disabled={isPending || !current} onClick={() => save(current)}>
+        <Button size="sm" variant="outline" disabled={isPending} onClick={() => save(current)}>
           {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
           Klopt
         </Button>

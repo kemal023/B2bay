@@ -165,7 +165,27 @@ function trainState(products, mappings) {
   };
 }
 
-/** A "suggested" row for every supplier path not seen before; counts refreshed for all. */
+// A supplier's catch-all ("Other", "Pozostałe", "New products", ...) holds
+// anything; mapping it as a whole would put all of it in one category.
+const CATCH_ALL = /^(other|others|andere|sonstiges|pozostałe|pozostale|inne|misc|miscellaneous|divers|autres|overig|overige|new products|nowe produkty|neuheiten|nouveautés|nieuw|novelties)$/i;
+export const isCatchAll = (path) => CATCH_ALL.test(path.split(" > ").at(-1).trim());
+
+/** A shorter prefix of the path is already confirmed: the path follows it. */
+function hasConfirmedAncestor(mappings, supplierId, path) {
+  const segs = path.split(" > ");
+  for (let i = segs.length - 1; i > 0; i--) {
+    if (mappings.get(`${supplierId}|${segs.slice(0, i).join(" > ")}`)?.status === "confirmed") return true;
+  }
+  return false;
+}
+
+/**
+ * Every supplier path (top two levels) that isn't covered yet gets a row:
+ * a catch-all is set to "per_product", anything else gets a "suggested"
+ * mapping from its products' names. A path under a confirmed parent needs
+ * no row of its own; leftover suggestions for such paths are removed.
+ * Product counts are refreshed for all rows.
+ */
 async function refreshMappingRows(sql, state, products) {
   const groups = new Map();
   for (const p of products) {
@@ -178,8 +198,18 @@ async function refreshMappingRows(sql, state, products) {
     if (g.names.length < 300) g.names.push(p.name);
   }
   const fresh = [];
+  const redundant = [];
   for (const [key, g] of groups) {
-    if (state.mappings.has(key)) continue;
+    const covered = hasConfirmedAncestor(state.mappings, g.supplierId, g.path);
+    if (state.mappings.has(key)) {
+      if (covered && state.mappings.get(key).status !== "confirmed") redundant.push(g);
+      continue;
+    }
+    if (covered) continue;
+    if (isCatchAll(g.path)) {
+      fresh.push({ ...g, main: null, sub: null, status: "per_product" });
+      continue;
+    }
     const votes = new Map();
     for (const name of g.names) {
       const guess = predict(state.mainModel, name);
@@ -194,16 +224,22 @@ async function refreshMappingRows(sql, state, products) {
     const subVotes = [...votes].filter(([k]) => k.startsWith(`${main}|`) && k.split("|")[1]).sort((a, b) => b[1] - a[1]);
     // Only suggest a subcategory when most of the path's products agree on it.
     const sub = subVotes[0] && subVotes[0][1] >= g.names.length * 0.6 ? subVotes[0][0].split("|")[1] : null;
-    fresh.push({ ...g, main, sub });
+    fresh.push({ ...g, main, sub, status: "suggested" });
   }
   if (fresh.length) {
     await sql`
       insert into category_mappings (supplier_id, source_path, main_category, sub_category, status, product_count)
-      select x.s::uuid, x.p, x.m, nullif(x.u, ''), 'suggested', x.c
+      select x.s::uuid, x.p, nullif(x.m, ''), nullif(x.u, ''), x.st, x.c
       from unnest(${fresh.map((f) => f.supplierId)}::text[], ${fresh.map((f) => f.path)}::text[],
-                  ${fresh.map((f) => f.main)}::text[], ${fresh.map((f) => f.sub ?? "")}::text[],
-                  ${fresh.map((f) => f.count)}::int[]) as x(s, p, m, u, c)
+                  ${fresh.map((f) => f.main ?? "")}::text[], ${fresh.map((f) => f.sub ?? "")}::text[],
+                  ${fresh.map((f) => f.status)}::text[], ${fresh.map((f) => f.count)}::int[]) as x(s, p, m, u, st, c)
       on conflict (supplier_id, source_path) do nothing`;
+  }
+  if (redundant.length) {
+    await sql`
+      delete from category_mappings c
+      using unnest(${redundant.map((g) => g.supplierId)}::text[], ${redundant.map((g) => g.path)}::text[]) as x(s, p)
+      where c.supplier_id = x.s::uuid and c.source_path = x.p and c.status <> 'confirmed'`;
   }
   // Counts only; updated_at stays the moment the mapping itself last changed.
   const all = [...groups.values()];
