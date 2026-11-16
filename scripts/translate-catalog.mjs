@@ -23,6 +23,7 @@
  * Every translation passes src/lib/translation-guard.mjs. Anything it can't
  * trust falls back to English (for Dutch) or is left out (never Polish).
  */
+import { createHash } from "node:crypto";
 import { neon } from "@neondatabase/serverless";
 import {
   expandPolishAbbreviations,
@@ -90,6 +91,9 @@ async function detect(text) {
   return best?.language ?? null;
 }
 
+/** Hex md5, matching Postgres md5() — the key of translations_key_idx. */
+const md5 = (text) => createHash("md5").update(text).digest("hex");
+
 /**
  * Translates distinct strings with caching and the guardrails. Returns a Map
  * of accepted translations only; callers decide the fallback.
@@ -99,6 +103,7 @@ async function detect(text) {
  */
 async function translateTexts(texts, from, to, { allowPolish = false } = {}) {
   const unique = [...new Set(texts.filter((t) => t && t.trim()))];
+  const uniqueSet = new Set(unique);
   const result = new Map();
   if (unique.length === 0 || from === to) return result;
 
@@ -110,11 +115,15 @@ async function translateTexts(texts, from, to, { allowPolish = false } = {}) {
     !(from === "pl" && !allowPolish && isLikelyPolish(out)) &&
     (!foreign || inchesKept(src, out));
 
-  const cached = await sql.query(
-    `SELECT source_text, translated_text FROM translations
-     WHERE source_lang = $1 AND target_lang = $2 AND source_text = ANY($3)`,
-    [from, to, unique],
-  );
+  // The cache is keyed on md5 of the text (translations_key_idx); the exact
+  // text is compared too.
+  const cached = (
+    await sql.query(
+      `SELECT source_text, translated_text FROM translations
+       WHERE source_lang = $1 AND target_lang = $2 AND md5(source_text) = ANY($3)`,
+      [from, to, unique.map(md5)],
+    )
+  ).filter((r) => uniqueSet.has(r.source_text));
   const stale = [];
   for (const r of cached) {
     if (accept(r.source_text, r.translated_text)) result.set(r.source_text, r.translated_text);
@@ -122,8 +131,9 @@ async function translateTexts(texts, from, to, { allowPolish = false } = {}) {
   }
   if (stale.length > 0) {
     await sql.query(
-      `DELETE FROM translations WHERE source_lang = $1 AND target_lang = $2 AND source_text = ANY($3)`,
-      [from, to, stale],
+      `DELETE FROM translations WHERE source_lang = $1 AND target_lang = $2 AND md5(source_text) = ANY($3)
+         AND source_text = ANY($4)`,
+      [from, to, stale.map(md5), stale],
     );
   }
 

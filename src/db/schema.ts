@@ -10,7 +10,7 @@ import {
   jsonb,
   uuid,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 export const companyStatusEnum = pgEnum("company_status", [
   "pending",
@@ -383,7 +383,9 @@ export const translations = pgTable(
       .defaultNow(),
   },
   (t) => [
-    uniqueIndex("translations_source_idx").on(t.sourceLang, t.targetLang, t.sourceText),
+    // On a hash of the text, not the text itself: a full-text key made this
+    // index bigger than the cached text (221 MB of a 1 GB database).
+    uniqueIndex("translations_key_idx").on(t.sourceLang, t.targetLang, sql`md5(${t.sourceText})`),
   ],
 );
 

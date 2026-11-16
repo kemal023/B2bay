@@ -1,4 +1,5 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { translations } from "@/db/schema";
 import {
@@ -65,6 +66,10 @@ async function translateRaw(
   return out;
 }
 
+function md5(text: string): string {
+  return createHash("md5").update(text).digest("hex");
+}
+
 async function readCache(
   texts: string[],
   source: Lang,
@@ -82,10 +87,14 @@ async function readCache(
       and(
         eq(translations.sourceLang, source),
         eq(translations.targetLang, target),
-        inArray(translations.sourceText, texts),
+        // The cache is keyed on md5 of the text (translations_key_idx).
+        inArray(sql`md5(${translations.sourceText})`, texts.map(md5)),
       ),
     );
-  return new Map(rows.map((r) => [r.sourceText, r.translatedText]));
+  const wanted = new Set(texts);
+  return new Map(
+    rows.filter((r) => wanted.has(r.sourceText)).map((r) => [r.sourceText, r.translatedText]),
+  );
 }
 
 async function writeCache(
