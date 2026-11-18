@@ -24,6 +24,8 @@ import {
   shopCategoryLabel,
 } from "@/lib/product-text";
 import { mainLabel, subLabel } from "@/lib/taxonomy.mjs";
+import { getCatalogRules } from "@/lib/rules";
+import { orderLimits } from "@/lib/stock-trust";
 import { FileCheck2, ImageOff, Languages, Lock, PackageCheck, Truck } from "lucide-react";
 
 const USP_ICONS = [PackageCheck, Truck, FileCheck2];
@@ -82,6 +84,9 @@ export default async function ProductDetailPage({
     : false;
   const showPrice = priceAccess === "visible";
   const p = t.product;
+  // Set while the supplier's stock is unconfirmed (sync down): the stock
+  // figure is stale, so it isn't shown and the order quantity is capped.
+  const maxQty = (await orderLimits(await getCatalogRules()))(product);
   const num = (n: number) => n.toLocaleString(intlLocale(locale));
 
   const name = localizedName(product, locale);
@@ -118,7 +123,7 @@ export default async function ProductDetailPage({
     { label: p.minOrder, value: `${product.minOrderQty} ${unit}` },
     {
       label: p.stock,
-      value: product.stockQty > 0 ? fmt(p.pieces, { count: num(product.stockQty) }) : p.onRequest,
+      value: maxQty !== null ? p.stockUnconfirmed : product.stockQty > 0 ? fmt(p.pieces, { count: num(product.stockQty) }) : p.onRequest,
     },
   ].filter((s): s is { label: string; value: string } => s !== null);
 
@@ -263,7 +268,14 @@ export default async function ProductDetailPage({
             )}
 
             <div className="mt-4 flex items-center gap-2 text-sm">
-              {product.stockQty > 0 ? (
+              {maxQty !== null ? (
+                <>
+                  <span className="h-2 w-2 rounded-full bg-amber-500" />
+                  <span className="font-medium text-amber-700 dark:text-amber-400">
+                    {p.stockUnconfirmed}
+                  </span>
+                </>
+              ) : product.stockQty > 0 ? (
                 <>
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
                   <span className="font-medium text-emerald-700 dark:text-emerald-400">
@@ -287,8 +299,12 @@ export default async function ProductDetailPage({
               <AddToCartForm
                 productId={product.id}
                 minOrderQty={product.minOrderQty}
+                maxQty={maxQty}
                 access={priceAccess}
               />
+              {maxQty !== null && showPrice && (
+                <p className="mt-2 text-xs text-muted-foreground">{fmt(p.limitedNote, { qty: maxQty })}</p>
+              )}
             </div>
 
             <ul className="mt-5 space-y-2.5 border-t border-border pt-4 text-xs text-muted-foreground">

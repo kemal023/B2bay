@@ -216,6 +216,12 @@ export const suppliers = pgTable(
     active: boolean("active").notNull().default(true),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     lastSyncError: text("last_sync_error"),
+    /**
+     * The last sync that went through without an error or warning. Unlike
+     * lastSyncedAt (every attempt), this says how current the stock is; when
+     * it is too old, order quantities are capped (lib/stock-trust.ts).
+     */
+    lastGoodSyncAt: timestamp("last_good_sync_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

@@ -205,6 +205,8 @@ export const fr: Dictionary = {
     min: "min. {qty}",
   },
   product: {
+    stockUnconfirmed: "Stock en cours de confirmation",
+    limitedNote: "Nous ne pouvons pas confirmer le stock actuel de ce produit pour le moment. Vous pouvez temporairement en commander {qty} au maximum par commande.",
     specs: "Détails du produit",
     ean: "EAN",
     category: "Catégorie",
@@ -235,6 +237,9 @@ export const fr: Dictionary = {
     quantity: "Quantité",
   },
   cart: {
+    limitedLine: "Temporairement max. {qty} par commande : stock en cours de confirmation",
+    limitedTo: "Vous pouvez commander au maximum {qty} de « {name} » pour le moment : nous ne pouvons pas confirmer le stock actuellement.",
+    limitedNote: "Certaines quantités ont été réduites au maximum temporaire, car nous ne pouvons pas confirmer le stock pour le moment.",
     title: "Panier",
     linesOne: "{count} ligne",
     linesOther: "{count} lignes",

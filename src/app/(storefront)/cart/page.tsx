@@ -15,13 +15,16 @@ import { vatTreatmentFor } from "@/lib/vat";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { deliveryAddresses } from "@/db/schema";
+import { getCatalogRules } from "@/lib/rules";
+import { orderLimits } from "@/lib/stock-trust";
 
 export default async function CartPage() {
-  const [{ items, subtotalCents }, user, { locale, t }, shipping] = await Promise.all([
+  const [{ items, subtotalCents }, user, { locale, t }, shipping, limitOf] = await Promise.all([
     getCartWithTotals(),
     getAppUserWithCompany(),
     getDictionary(),
     getShippingSettings(),
+    getCatalogRules().then(orderLimits),
   ]);
   const threshold = shipping.freeShippingThresholdCents;
   const freeShipping = qualifiesForFreeShipping(subtotalCents, shipping);
@@ -108,6 +111,7 @@ export default async function CartPage() {
                   id: item.id,
                   quantity: item.quantity,
                   unitPriceCents: item.unitPriceCents,
+                  maxQty: limitOf(item.product),
                   product: {
                     id: item.product.id,
                     name: item.product.name,

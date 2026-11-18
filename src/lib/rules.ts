@@ -22,10 +22,19 @@ import { products, settings } from "@/db/schema";
 export type CatalogRules = {
   /** A product needs at least this much stock before customers can buy it. */
   minStockQty: number;
+  /**
+   * When a supplier has not synced successfully for this many hours, its
+   * stock figures are no longer trusted...
+   */
+  staleAfterHours: number;
+  /** ...and customers can order at most this many of each of its products (0 = no cap). */
+  staleMaxQty: number;
 };
 
 export const DEFAULT_CATALOG_RULES: CatalogRules = {
   minStockQty: 0,
+  staleAfterHours: 24,
+  staleMaxQty: 5,
 };
 
 const CATALOG_RULES_KEY = "catalog_rules";
@@ -38,10 +47,12 @@ export async function getCatalogRules(): Promise<CatalogRules> {
   if (!row) return DEFAULT_CATALOG_RULES;
 
   const stored = row.value as Partial<CatalogRules>;
+  const pick = (k: keyof CatalogRules) =>
+    Number.isFinite(stored[k]) ? Number(stored[k]) : DEFAULT_CATALOG_RULES[k];
   return {
-    minStockQty: Number.isFinite(stored.minStockQty)
-      ? Number(stored.minStockQty)
-      : DEFAULT_CATALOG_RULES.minStockQty,
+    minStockQty: pick("minStockQty"),
+    staleAfterHours: pick("staleAfterHours"),
+    staleMaxQty: pick("staleMaxQty"),
   };
 }
 

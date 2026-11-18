@@ -337,7 +337,13 @@ export async function syncSupplier(supplier: SupplierRow): Promise<SyncResult> {
 
     await db
       .update(suppliers)
-      .set({ lastSyncedAt: new Date(), lastSyncError: warning ?? null })
+      .set({
+        lastSyncedAt: new Date(),
+        lastSyncError: warning ?? null,
+        // A sync that held back because the feed looked wrong did not
+        // confirm the stock, so it doesn't count as a good one.
+        ...(warning ? {} : { lastGoodSyncAt: new Date() }),
+      })
       .where(eq(suppliers.id, supplier.id));
 
     return {

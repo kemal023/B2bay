@@ -29,6 +29,8 @@ type CartItem = {
     currency: string;
     minOrderQty: number;
   };
+  /** Cap while the supplier's stock is unconfirmed, or null. */
+  maxQty?: number | null;
 };
 
 export function CartItemRow({ item }: { item: CartItem }) {
@@ -86,6 +88,11 @@ export function CartItemRow({ item }: { item: CartItem }) {
               qty: item.product.minOrderQty,
             })}
           </p>
+          {item.maxQty != null && (
+            <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+              {fmt(t.cart.limitedLine, { qty: item.maxQty })}
+            </p>
+          )}
           {item.unitPriceCents < item.product.priceCents && (
             <p className="mt-0.5 text-xs text-emerald-600 dark:text-emerald-400">
               {fmt(t.pricing.youSave, {
@@ -102,6 +109,7 @@ export function CartItemRow({ item }: { item: CartItem }) {
           <Input
             type="number"
             min={item.product.minOrderQty}
+            max={item.maxQty ?? undefined}
             value={item.quantity}
             onChange={(e) => setQuantity(Math.max(0, Number(e.target.value) || 0))}
             className="h-9 w-20"

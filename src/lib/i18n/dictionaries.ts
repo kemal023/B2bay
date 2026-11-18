@@ -210,6 +210,8 @@ const nl = {
     min: "min. {qty}",
   },
   product: {
+    stockUnconfirmed: "Voorraad wordt bevestigd",
+    limitedNote: "We kunnen de actuele voorraad van dit product nu niet bevestigen. Je kunt er tijdelijk maximaal {qty} per bestelling bestellen.",
     specs: "Productgegevens",
     ean: "EAN",
     category: "Categorie",
@@ -240,6 +242,9 @@ const nl = {
     quantity: "Aantal",
   },
   cart: {
+    limitedLine: "Tijdelijk max. {qty} per bestelling: voorraad wordt bevestigd",
+    limitedTo: "Van “{name}” kun je nu maximaal {qty} bestellen: we kunnen de voorraad tijdelijk niet bevestigen.",
+    limitedNote: "Sommige aantallen zijn verlaagd tot het tijdelijke maximum, omdat we de voorraad nu niet kunnen bevestigen.",
     title: "Winkelmandje",
     linesOne: "{count} regel",
     linesOther: "{count} regels",
@@ -607,6 +612,8 @@ const en: Dictionary = {
     min: "min. {qty}",
   },
   product: {
+    stockUnconfirmed: "Stock being confirmed",
+    limitedNote: "We can't confirm the current stock of this product right now. For the time being you can order up to {qty} per order.",
     specs: "Product details",
     ean: "EAN",
     category: "Category",
@@ -637,6 +644,9 @@ const en: Dictionary = {
     quantity: "Quantity",
   },
   cart: {
+    limitedLine: "Temporarily max. {qty} per order: stock being confirmed",
+    limitedTo: "You can order at most {qty} of “{name}” right now: we can't confirm the stock at the moment.",
+    limitedNote: "Some quantities were lowered to the temporary maximum because we can't confirm the stock right now.",
     title: "Cart",
     linesOne: "{count} line",
     linesOther: "{count} lines",

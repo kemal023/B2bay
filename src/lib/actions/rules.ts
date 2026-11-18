@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { suppliers } from "@/db/schema";
 import { getAppUser } from "@/lib/auth";
-import { applySupplierMargin, saveCatalogRules } from "@/lib/rules";
+import { applySupplierMargin, getCatalogRules, saveCatalogRules } from "@/lib/rules";
 
 export type RuleActionResult =
   | { ok: true; message: string }
@@ -27,7 +27,7 @@ export async function updateCatalogRules(formData: FormData): Promise<RuleAction
       return { ok: false, error: "Minimale voorraad moet 0 of hoger zijn." };
     }
 
-    await saveCatalogRules({ minStockQty: Math.floor(minStockQty) });
+    await saveCatalogRules({ ...(await getCatalogRules()), minStockQty: Math.floor(minStockQty) });
 
     revalidatePath("/admin/rules");
     revalidatePath("/products");
@@ -39,6 +39,38 @@ export async function updateCatalogRules(formData: FormData): Promise<RuleAction
         minStockQty > 0
           ? `Regel opgeslagen: alleen producten met minimaal ${minStockQty} op voorraad zijn te koop.`
           : "Regel opgeslagen: er geldt geen voorraaddrempel meer.",
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Onbekende fout." };
+  }
+}
+
+/** How many of a product customers may order while its supplier's stock is unconfirmed. */
+export async function updateStaleStockRule(formData: FormData): Promise<RuleActionResult> {
+  try {
+    await requireAdmin();
+    const staleAfterHours = Number(formData.get("staleAfterHours") ?? 0);
+    const staleMaxQty = Number(formData.get("staleMaxQty") ?? 0);
+    if (!Number.isFinite(staleAfterHours) || staleAfterHours < 1) {
+      return { ok: false, error: "Het aantal uren moet minimaal 1 zijn." };
+    }
+    if (!Number.isFinite(staleMaxQty) || staleMaxQty < 0) {
+      return { ok: false, error: "Het maximum moet 0 of hoger zijn." };
+    }
+    await saveCatalogRules({
+      ...(await getCatalogRules()),
+      staleAfterHours: Math.floor(staleAfterHours),
+      staleMaxQty: Math.floor(staleMaxQty),
+    });
+    revalidatePath("/admin/rules");
+    revalidatePath("/products", "layout");
+    revalidatePath("/cart");
+    return {
+      ok: true,
+      message:
+        staleMaxQty > 0
+          ? `Opgeslagen: na ${Math.floor(staleAfterHours)} uur zonder geslaagde sync kunnen klanten maximaal ${Math.floor(staleMaxQty)} per product bestellen.`
+          : "Opgeslagen: er geldt geen maximum meer bij een uitgevallen sync.",
     };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Onbekende fout." };

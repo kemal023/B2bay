@@ -11,6 +11,9 @@ import { getAppUserWithCompany } from "@/lib/auth";
 import { getShippingSettings, qualifiesForFreeShipping } from "@/lib/shipping";
 import { notifyNewOrder } from "@/lib/email/notify";
 import { localizedName } from "@/lib/product-text";
+import { fmt } from "@/lib/i18n/dictionaries";
+import { getCatalogRules } from "@/lib/rules";
+import { orderLimits } from "@/lib/stock-trust";
 
 export type ActionResult = { ok: true; orderId: string } | { ok: false; error: string };
 
@@ -36,6 +39,17 @@ export async function placeOrder(deliveryAddressId?: string | null): Promise<Act
   });
 
   if (items.length === 0) return { ok: false, error: "Je winkelmandje is leeg." };
+
+  // A cart filled before a supplier sync started failing can hold more than
+  // may now be ordered while its stock is unconfirmed (lib/stock-trust.ts).
+  const limitOf = await orderLimits(await getCatalogRules());
+  for (const i of items) {
+    const max = limitOf(i.product);
+    if (max !== null && i.quantity > max) {
+      const { t, locale } = await getDictionary();
+      return { ok: false, error: fmt(t.cart.limitedTo, { name: localizedName(i.product, locale), qty: max }) };
+    }
+  }
 
   // Optional delivery address of this company, copied onto the order so a
   // later edit or deletion of the address never changes where it went.

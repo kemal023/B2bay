@@ -13,10 +13,13 @@ import { Loader2, ShoppingCart } from "lucide-react";
 export function AddToCartForm({
   productId,
   minOrderQty,
+  maxQty = null,
   access,
 }: {
   productId: string;
   minOrderQty: number;
+  /** Cap while the supplier's stock is unconfirmed; the server enforces it too. */
+  maxQty?: number | null;
   access: PriceAccess;
 }) {
   const [quantity, setQuantity] = useState(minOrderQty);
@@ -56,9 +59,13 @@ export function AddToCartForm({
       <Input
         type="number"
         min={minOrderQty}
+        max={maxQty ?? undefined}
         step={1}
         value={quantity}
-        onChange={(e) => setQuantity(Math.max(minOrderQty, Number(e.target.value) || minOrderQty))}
+        onChange={(e) => {
+          const n = Math.max(minOrderQty, Number(e.target.value) || minOrderQty);
+          setQuantity(maxQty === null ? n : Math.min(n, maxQty));
+        }}
         className="w-24"
         aria-label={t.product.quantity}
       />

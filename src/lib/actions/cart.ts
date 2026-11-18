@@ -10,6 +10,8 @@ import { getDictionary } from "@/lib/i18n/server";
 import { fmt } from "@/lib/i18n/dictionaries";
 import { getPricingContext, unitPriceCents } from "@/lib/pricing";
 import { parseQuickOrder } from "@/lib/quick-order";
+import { orderLimits } from "@/lib/stock-trust";
+import { localizedName } from "@/lib/product-text";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -33,6 +35,15 @@ async function requireApprovedCompany() {
   return user;
 }
 
+/** "You can order at most N of <product> right now", in the customer's language. */
+async function limitedMessage(
+  product: { name: string; nameNl: string | null; nameDe: string | null; nameFr: string | null },
+  max: number,
+): Promise<string> {
+  const { t, locale } = await getDictionary();
+  return fmt(t.cart.limitedTo, { name: localizedName(product, locale), qty: max });
+}
+
 export async function addToCart(
   productId: string,
   quantity: number,
@@ -52,8 +63,6 @@ export async function addToCart(
       };
     }
 
-    const qty = Math.max(quantity, product.minOrderQty);
-
     const existing = await db.query.cartItems.findFirst({
       where: and(
         eq(cartItems.companyId, user.company!.id),
@@ -61,21 +70,26 @@ export async function addToCart(
       ),
     });
 
+    const wanted = (existing?.quantity ?? 0) + Math.max(quantity, product.minOrderQty);
+    const max = (await orderLimits(rules))(product);
+    const total = max === null ? wanted : Math.min(wanted, max);
+
     if (existing) {
       await db
         .update(cartItems)
-        .set({ quantity: existing.quantity + qty, updatedAt: new Date() })
+        .set({ quantity: total, updatedAt: new Date() })
         .where(eq(cartItems.id, existing.id));
     } else {
       await db.insert(cartItems).values({
         companyId: user.company!.id,
         productId,
-        quantity: qty,
+        quantity: total,
       });
     }
 
     revalidatePath("/cart");
     revalidatePath("/products");
+    if (total < wanted) return { ok: false, error: await limitedMessage(product, total) };
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Onbekende fout." };
@@ -95,10 +109,19 @@ export async function updateCartItemQuantity(
         .delete(cartItems)
         .where(and(eq(cartItems.id, itemId), eq(cartItems.companyId, user.company!.id)));
     } else {
+      const item = await db.query.cartItems.findFirst({
+        where: and(eq(cartItems.id, itemId), eq(cartItems.companyId, user.company!.id)),
+        with: { product: true },
+      });
+      if (!item) return { ok: true };
+      const max = (await orderLimits(await getCatalogRules()))(item.product);
+      const qty = max === null ? quantity : Math.min(quantity, max);
       await db
         .update(cartItems)
-        .set({ quantity, updatedAt: new Date() })
-        .where(and(eq(cartItems.id, itemId), eq(cartItems.companyId, user.company!.id)));
+        .set({ quantity: qty, updatedAt: new Date() })
+        .where(eq(cartItems.id, item.id));
+      revalidatePath("/cart");
+      if (qty < quantity) return { ok: false, error: await limitedMessage(item.product, qty) };
     }
 
     revalidatePath("/cart");
@@ -141,7 +164,7 @@ export async function getCartWithTotals() {
 async function addLinesToCart(
   companyId: string,
   lines: { productId: string; quantity: number }[],
-): Promise<{ added: string[]; raised: string[]; unavailable: string[] }> {
+): Promise<{ added: string[]; raised: string[]; unavailable: string[]; capped: string[] }> {
   const db = getDb();
   const rules = await getCatalogRules();
   const ids = [...new Set(lines.map((l) => l.productId))];
@@ -151,6 +174,15 @@ async function addLinesToCart(
       })
     : [];
   const byId = new Map(sellable.map((p) => [p.id, p]));
+  const limitOf = await orderLimits(rules);
+  const inCart = new Map(
+    (ids.length
+      ? await db.query.cartItems.findMany({
+          where: and(eq(cartItems.companyId, companyId), inArray(cartItems.productId, ids)),
+        })
+      : []
+    ).map((c) => [c.productId, c.quantity]),
+  );
 
   const wanted = new Map<string, number>();
   for (const l of lines) wanted.set(l.productId, (wanted.get(l.productId) ?? 0) + l.quantity);
@@ -158,14 +190,24 @@ async function addLinesToCart(
   const added: string[] = [];
   const raised: string[] = [];
   const unavailable: string[] = [];
+  const capped: string[] = [];
   for (const [productId, quantity] of wanted) {
     const product = byId.get(productId);
     if (!product) {
       unavailable.push(productId);
       continue;
     }
-    const qty = Math.max(quantity, product.minOrderQty);
+    let qty = Math.max(quantity, product.minOrderQty);
     if (qty > quantity) raised.push(product.id);
+    const max = limitOf(product);
+    if (max !== null) {
+      const room = Math.max(0, max - (inCart.get(productId) ?? 0));
+      if (qty > room) {
+        capped.push(product.id);
+        qty = room;
+      }
+      if (qty === 0) continue;
+    }
     await db
       .insert(cartItems)
       .values({ companyId, productId, quantity: qty })
@@ -175,7 +217,7 @@ async function addLinesToCart(
       });
     added.push(product.id);
   }
-  return { added, raised, unavailable };
+  return { added, raised, unavailable, capped };
 }
 
 export type BulkResult =
@@ -207,7 +249,10 @@ export async function reorder(orderId: string): Promise<BulkResult> {
     return {
       ok: true,
       message: fmt(t.reorder.added, { count: result.added.length }),
-      notes: gone.length ? [fmt(t.reorder.skipped, { names: gone.join(", ") })] : [],
+      notes: [
+        ...(gone.length ? [fmt(t.reorder.skipped, { names: gone.join(", ") })] : []),
+        ...(result.capped.length ? [t.cart.limitedNote] : []),
+      ],
     };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : t.common.error };
@@ -250,7 +295,7 @@ export async function quickOrder(text: string): Promise<BulkResult> {
     }
     const result = lines.length
       ? await addLinesToCart(user.company!.id, lines)
-      : { added: [], raised: [], unavailable: [] };
+      : { added: [], raised: [], unavailable: [], capped: [] };
 
     const notes: string[] = [];
     if (notFound.length) notes.push(`${t.quickOrder.notFound} ${[...new Set(notFound)].join(", ")}`);
@@ -258,6 +303,7 @@ export async function quickOrder(text: string): Promise<BulkResult> {
       const codesRaised = found.filter((p) => result.raised.includes(p.id)).map((p) => p.ean ?? p.supplierSku);
       notes.push(`${t.quickOrder.adjusted} ${codesRaised.join(", ")}`);
     }
+    if (result.capped.length) notes.push(t.cart.limitedNote);
     if (result.added.length === 0) return { ok: false, error: notes.join(" ") || t.quickOrder.nothing };
 
     revalidatePath("/cart");
@@ -300,7 +346,7 @@ export async function addFavoritesToCart(): Promise<BulkResult> {
     );
     if (result.added.length === 0) return { ok: false, error: t.reorder.none };
     revalidatePath("/cart");
-    return { ok: true, message: fmt(t.quickOrder.added, { count: result.added.length }), notes: [] };
+    return { ok: true, message: fmt(t.quickOrder.added, { count: result.added.length }), notes: result.capped.length ? [t.cart.limitedNote] : [] };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : t.common.error };
   }
