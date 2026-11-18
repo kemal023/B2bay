@@ -22,9 +22,9 @@
  * by a character check in the guard.
  */
 import { writeFileSync } from "node:fs";
-import { neon } from "@neondatabase/serverless";
+import { connect } from "./db.mjs";
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = connect();
 
 const MIN_POLISH = 5; // seen at least this often in Polish source names
 // Kept unchanged in under this share of translations; brands sit near 1.0.

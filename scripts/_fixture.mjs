@@ -1,7 +1,7 @@
 // Test fixture: approved test company + user + session. `node fixture.mjs up|down`
-import { neon } from "@neondatabase/serverless";
+import { connect } from "./db.mjs";
 import { createHash, randomBytes } from "node:crypto";
-const sql = neon(process.env.DATABASE_URL);
+const sql = connect();
 const EMAIL = "claude-test@example.invalid";
 if (process.argv[2] === "down") {
   const [u] = await sql`select company_id from users where email=${EMAIL}`;

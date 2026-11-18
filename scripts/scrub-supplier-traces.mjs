@@ -10,10 +10,10 @@
  * the other languages from the cleaned English (machine translations had
  * turned "Maxy" into things like "Max.").
  */
-import { neon } from "@neondatabase/serverless";
+import { connect } from "./db.mjs";
 import { scrubSupplierTraces } from "../src/lib/supplier-scrub.mjs";
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = connect();
 const COLS = ["source_description", "description", "description_nl", "description_de", "description_fr",
   "source_name", "name", "name_nl", "name_de", "name_fr"];
 const match = COLS.map((c) => `${c} ~* 'maxy|annapol'`).join(" or ");

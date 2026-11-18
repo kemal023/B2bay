@@ -3,9 +3,9 @@
  *
  *   npx dotenv -e .env.local -- node scripts/translate-progress.mjs
  */
-import { neon } from "@neondatabase/serverless";
+import { connect } from "./db.mjs";
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = connect();
 
 const [row] = await sql.query(`
   SELECT COUNT(*)::int AS totaal,

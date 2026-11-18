@@ -24,7 +24,7 @@
  * trust falls back to English (for Dutch) or is left out (never Polish).
  */
 import { createHash } from "node:crypto";
-import { neon } from "@neondatabase/serverless";
+import { connect } from "./db.mjs";
 import {
   expandPolishAbbreviations,
   inchesKept,
@@ -39,7 +39,7 @@ import {
 } from "../src/lib/translation-guard.mjs";
 import { categorizeStep } from "./categorize.mjs";
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = connect();
 const TRANSLATE_URL = process.env.TRANSLATE_URL ?? "http://localhost:5050";
 const NAME_BATCH = Number(process.env.TRANSLATE_BATCH ?? 25);
 const DESC_BATCH = Number(process.env.TRANSLATE_DESC_BATCH ?? 4);

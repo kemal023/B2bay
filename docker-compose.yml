@@ -1,4 +1,46 @@
+# DB_PASSWORD comes from ./.env (not committed). Every service reaches the
+# database as `db` on the compose network; .env.local's DATABASE_URL points
+# at 127.0.0.1:5433 for scripts run on the host.
+x-database-url: &database-url DATABASE_URL=postgresql://cosmeweb:${DB_PASSWORD:?set DB_PASSWORD in .env}@db:5432/cosmeweb
+
 services:
+  # The shop's database (moved here from Neon on 2026-11-16: the 1 GB
+  # plan was full). Data lives in the `db-data` volume; backups below.
+  #
+  #   psql    : docker exec -it cosmeweb-db psql -U cosmeweb
+  db:
+    image: postgres:18-alpine
+    container_name: cosmeweb-db
+    environment:
+      - POSTGRES_USER=cosmeweb
+      - POSTGRES_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in .env}
+      - POSTGRES_DB=cosmeweb
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=512MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - max_connections=50
+    # Only this computer can connect (for scripts and tools); never the network.
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - db-data:/var/lib/postgresql
+    shm_size: 256m
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cosmeweb -d cosmeweb"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   app:
     build:
       context: .
@@ -11,6 +53,7 @@ services:
       - .env.local
     environment:
       - NODE_ENV=production
+      - *database-url
       # Reachable over the compose network; never exposed to the internet.
       - TRANSLATE_URL=http://libretranslate:5000
       - BACKUP_DIR=/backups
@@ -18,7 +61,10 @@ services:
       # Read-only, so the watchdog can tell when backups stop.
       - ./backups:/backups:ro
     depends_on:
-      - libretranslate
+      db:
+        condition: service_healthy
+      libretranslate:
+        condition: service_started
     restart: unless-stopped
 
   # Self-hosted translation. The catalogue is ~51M characters, which no free
@@ -76,9 +122,13 @@ services:
       - .env.local
     environment:
       - TRANSLATE_URL=http://libretranslate:5000
+      - *database-url
     command: node scripts/translate-catalog.mjs
     depends_on:
-      - libretranslate
+      db:
+        condition: service_healthy
+      libretranslate:
+        condition: service_started
     mem_limit: 512m
     restart: unless-stopped
 
@@ -95,15 +145,15 @@ services:
       - .env.local
     environment:
       - APP_INTERNAL_URL=http://app:3000
+      - *database-url
     command: node scripts/scheduler.mjs
     depends_on:
       - app
     mem_limit: 128m
     restart: unless-stopped
 
-  # Daily pg_dump of the Neon database into ./backups, last 14 days kept.
-  # Neon keeps its own short restore history too; this is the copy that
-  # survives a deleted project or a mistake noticed weeks later.
+  # Daily pg_dump of the database into ./backups, last 14 days kept. These
+  # sit on the same disk as the database: copy ./backups somewhere else too.
   #
   #   volgen  : docker logs -f cosmeweb-backup
   backup:
@@ -116,9 +166,15 @@ services:
       - .env.local
     environment:
       - KEEP_DAYS=14
+      - *database-url
+      - DATABASE_URL_UNPOOLED=
     entrypoint: ["sh", "/backup.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
     mem_limit: 256m
     restart: unless-stopped
 
 volumes:
+  db-data:
   libretranslate-models:

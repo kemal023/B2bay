@@ -4,11 +4,11 @@
  *
  *   npx dotenv -e .env.local -- node scripts/seed-category-mappings.mjs
  */
-import { neon } from "@neondatabase/serverless";
+import { connect } from "./db.mjs";
 import { isSubOf, TAXONOMY } from "../src/lib/taxonomy.mjs";
 import { SEED } from "./category-seed.mjs";
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = connect();
 const mains = new Set(TAXONOMY.map((m) => m.slug));
 
 for (const [supplierName, paths] of Object.entries(SEED)) {

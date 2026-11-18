@@ -23,7 +23,7 @@
  * category_key records what a placement was based on (path, name, version of
  * the confirmed mappings), so only products whose inputs changed are redone.
  */
-import { neon } from "@neondatabase/serverless";
+import { connect } from "./db.mjs";
 import { TAXONOMY, OTHER, isSubOf } from "../src/lib/taxonomy.mjs";
 
 const BATCH = 2000;
@@ -336,7 +336,7 @@ async function evaluate(sql) {
 
 // Run directly (not when imported by the translator).
 if (process.argv[1]?.endsWith("categorize.mjs")) {
-  const sql = neon(process.env.DATABASE_URL);
+  const sql = connect();
   if (process.argv.includes("--evaluate")) {
     await evaluate(sql);
   } else if (process.argv.includes("--once")) {
